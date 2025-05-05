@@ -15,11 +15,9 @@ from django.shortcuts import render
 from .forms import FormSend
 from django.contrib import messages
 from crontab import CronTab
-
 import subprocess
 from django.http import JsonResponse
 from django.shortcuts import render
-
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from backend.models import Server1, BackupConfig
@@ -45,7 +43,6 @@ from django.contrib import messages
 from django.shortcuts import render, redirect
 from django.shortcuts import render, redirect
 from django.contrib import messages
-
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from crontab import CronTab
