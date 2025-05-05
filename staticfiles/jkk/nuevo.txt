@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% load static %}
+{% block scripts %}
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="{% static 'js/fade_errors.js' %}"></script>
+{% endblock %}
+{% block estilos %}
+    <link rel="stylesheet" type="text/css" href="{% static 'css/login.css' %}">
+{% endblock %}
+{% block contenido %}
+<section class="vh-100 bg-image-vertical">
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-sm-6 text-black">
+                <div class="px-5 ms-xl-4">
+                    <i class="fas fa-crow fa-2x me-3 pt-5 mt-xl-4" style="color: #709085;"></i>
+                    <span class="h1 fw-bold mb-0">Logo</span>
+                </div>
+                <div class="d-flex align-items-center h-custom-2 px-5 ms-xl-4 mt-5 pt-5 pt-xl-0 mt-xl-n5">
+                    <form method="post" style="width: 23rem;">
+                        {% csrf_token %}
+                        <h3 class="fw-normal mb-3 pb-3" style="letter-spacing: 1px;">Log in</h3>
+                        <div class="form-outline mb-4">
+                            {{ form.username }}
+                            {% if form.username.errors %}
+                                {% for error in form.username.errors %}
+                                    <div class="alert alert-danger mt-2">
+                                        {{ error }}
+                                    </div>
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+                        <div class="form-outline mb-4">
+                            {{ form.password }}
+                            {% if form.password.errors %}
+                                {% for error in form.password.errors %}
+                                    <div class="alert alert-danger mt-2">
+                                        {{ error }}
+                                    </div>
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+                        <div class="pt-1 mb-4">
+                            <button type="submit" class="btn btn-info btn-lg btn-block">Login</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            <div class="col-sm-6 px-0 d-none d-sm-block">
+                <img src="{% static 'imgs/uv.png' %}" alt="pruebas">
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+
+
+
+
+
+
+server {
+        listen 80;
+        server_name respaldosuv.mx;
+
+location / {
+        proxy_pass http://192.168.1.71:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;    
+        }
+
+    location /static/ {
+        alias /var/www/staticfiles/;
+    }
+
+    
+
+    location = /static/error_pages/ {
+        internal;
+    }
+}
+

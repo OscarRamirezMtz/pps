@@ -1,0 +1,21 @@
+/* login.css */
+
+body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    margin: 0;
+    background-color: #f8f9fa; /* Cambia el color de fondo según tus preferencias */
+}
+
+.login-container {
+    width: 400px; /* Ajusta el ancho del contenedor según tus preferencias */
+    padding: 20px;
+    border: 1px solid #ced4da; /* Cambia el color del borde según tus preferencias */
+    border-radius: 8px;
+    background-color: #fff; /* Cambia el color de fondo del contenedor según tus preferencias */
+}
+
+/* Puedes agregar más estilos según sea necesario */
+

@@ -1,0 +1,81 @@
+{% extends "base2.html" %}
+{% block titulo %}Alta de servidores{% endblock %}
+{% load static %}
+
+{% block scripts %}
+    <script src="{% static 'js/limpiar.js' %}"></script>
+    <script src="{% static 'js/fade_errors.js' %}"></script>
+{% endblock %}
+
+{% block encabezado %}
+    Alta de servidores remotos:
+{% endblock %}
+{% block contenido %}
+    <div class="container">
+        <h2 class="mt-5">Bienvenido, da de alta un servidor</h2>
+
+        {% if success_message %}
+            <div class="messages">
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    {{ success_message }}
+                    
+
+                </div>
+            </div>
+        {% endif %}
+
+        {% if messages %}
+            <div class="messages">
+                {% for message in messages %}
+                    <div class="alert {% if message.tags == 'error' %}alert-danger{% elif message.tags == 'success' %}alert-success{% endif %} alert-dismissible fade show" role="alert">
+                        {{ message }}
+
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <form method="post" class="mt-4" id="alta-form">
+            {% csrf_token %}
+
+            <div class="form-group row">
+                <label for="{{ form.nombre.id_for_label }}" class="col-sm-2 col-form-label">{{ form.nombre.label_tag }}</label>
+                <div class="col-sm-10">
+                    {{ form.nombre }}
+                    {% if form.nombre.errors %}
+                        <p class="text-danger">{{ form.nombre.errors.0 }}</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="form-group row">
+                <label for="{{ form.ip.id_for_label }}" class="col-sm-2 col-form-label">{{ form.ip.label_tag }}</label>
+                <div class="col-sm-10">
+                    {{ form.ip }}
+                    {% if form.ip.errors %}
+                        <p class="text-danger">{{ form.ip.errors.0 }}</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="form-group row">
+                <label for="{{ form.usuario_remoto.id_for_label }}" class="col-sm-2 col-form-label">{{ form.usuario_remoto.label_tag }}</label>
+                <div class="col-sm-10">
+                    {{ form.usuario_remoto }}
+                    {% if form.usuario_remoto.errors %}
+                        <p class="text-danger">{{ form.usuario_remoto.errors.0 }}</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Eliminar campos de password de bot y llaves SSH -->
+            <!-- Los campos de password_bot y llave_publica se han eliminado de la plantilla -->
+
+            <div class="form-group row">
+                <div class="col-sm-10 offset-sm-2">
+                    <button type="submit" class="btn btn-primary">Guardar servidor</button>
+                </div>
+            </div>
+        </form>
+    </div>
+{% endblock %}

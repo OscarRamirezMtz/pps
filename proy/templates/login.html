@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block scripts %}
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="{% static 'js/fade_errors.js' %}"></script>
+{% endblock %}
+
+{% block contenido %}
+    <link rel="stylesheet" type="text/css" href="{% static 'css/login.css' %}">
+    
+    <div class="login-container">
+        <h2 class="mt-5 text-center">¡Bienvenido de nuevo!</h2>
+        <form method="post" class="mt-4">
+            {% csrf_token %}
+            
+            {% if form.non_field_errors %}
+                <div class="alert alert-danger text-center">
+                    {% for error in form.non_field_errors %}
+                        {{ error }}
+                    {% endfor %}
+                </div>
+            {% endif %}
+            
+            <div class="form-group row">
+                <label for="{{ form.username.id_for_label }}" class="col-sm-3 col-form-label">Usuario</label>
+                <div class="col-sm-9">
+                    {{ form.username }}
+                    {% if form.username.errors %}
+                        {% for error in form.username.errors %}
+                            <div class="alert alert-danger mt-2">
+                                {{ error }}
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="form-group row">
+                <label for="{{ form.password.id_for_label }}" class="col-sm-3 col-form-label">Contraseña</label>
+                <div class="col-sm-9">
+                    {{ form.password }}
+                    {% if form.password.errors %}
+                        {% for error in form.password.errors %}
+                            <div class="alert alert-danger mt-2">
+                                {{ error }}
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+            </div>
+            <div class="form-group row">
+                <label class="col-sm-3 col-form-label">Captcha</label>
+                <div class="col-sm-9">
+                    {{ form.captcha }}
+                    {% if form.captcha.errors %}
+                        {% for error in form.captcha.errors %}
+                            <div class="alert alert-danger mt-2">
+                                {{ error }}
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+            </div>
+            
+
+            <div class="form-group row">
+                <div class="col-sm-12 text-center">
+                    <button type="submit" class="btn btn-primary">Acceder</button>
+                </div>
+            </div>
+        </form>
+        
+ 
+    </div>
+{% endblock %}
+
