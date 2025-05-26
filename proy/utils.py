@@ -6,8 +6,6 @@
 
 # import requests
 
-# TOKEN = '7646354021:AAGHWbso1ElgTElQY1jvgLBvjgsbgbLCBLs'
-# CHAT_ID = '1185258431'
 
 # def mandar_mensaje(mensaje: str, token=TOKEN, chat_id=CHAT_ID) -> bool:
 #     url = f'https://api.telegram.org/bot{token}/sendMessage'
