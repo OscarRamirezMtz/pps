@@ -52,7 +52,7 @@ def login_view(request):
             return redirect("login")
 
         if authenticate(request, username=user.username, password=form.cleaned_data["password"]):
-            # contraseña correcta ⇒ genera OTP y salta al paso 2
+            # contraseña correcta, genera OTP y salta al paso 2
             request.session["preauth_user_id"] = user.id
             code = generate_otp()
             OTPCode.objects.create(user=user, code=code)
@@ -95,7 +95,7 @@ def otp_verification_view(request):
         otp = request.POST.get("otp", "").strip()
         codigo = OTPCode.objects.filter(user=user).order_by("-creado").first()
 
-        es_valido = codigo and not codigo.is_expired() and codigo.code == otp
+        es_valido = codigo and not codigo.expirado() and codigo.code == otp
         if not es_valido:
             intento.intentos += 1
             if intento.intentos >= MAX_OTP_INTENTOS:

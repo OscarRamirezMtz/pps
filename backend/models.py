@@ -21,7 +21,7 @@ class OTPCode(models.Model):
     code = models.CharField(max_length=10)
     creado = models.DateTimeField(auto_now_add=True)
 
-    def is_expired(self):
+    def expirado(self):
         return timezone.now() > self.creado + timedelta(minutes=5)
     
 
