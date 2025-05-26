@@ -15,7 +15,7 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
-from proy import views
+from backend import views
 from django.urls import path, include
 from django.views.generic import RedirectView
 
@@ -23,15 +23,17 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     #esta es la url que redirige una vez accedido al sitio "respaldosuv.mx" directamente al login
     path('', RedirectView.as_view(url='/login/', permanent=False)),
-    path('login/', views.login_view),
-    path('index/', views.index),
-    path('alta/', views.dar_alta),
-    path('logout/',views.logout_v),
+    #path('login/', views.login_view, name='login'),
+    path('index/', views.index, name='index'),
+    #path('alta/', views.dar_alta, name='server_add'),
+    path('logout/',views.logout_view, name='logout'),
     #path('actualiza/', views.get_server_choices),
-    path('logs/', views.ver_logs),
-    path('agregar/', views.crear_respaldo, name='agregar'),
-    path('baja/', views.ver_configuraciones_respaldo, name='ver_configuraciones_respaldo'),
-    path('cronlog/', views.cron_log_view, name='cron_log_view'),
-    path('ajax-cron-log/', views.ajax_cron_log, name='ajax_cron_log'),
-    path('captcha/', include('captcha.urls')),   
+    #path('logs/', views.ver_logs, name='server_list'),
+    #path('agregar/', views.crear_respaldo, name='agregar'),
+    #path('baja/', views.ver_configuraciones_respaldo, name='ver_configuraciones_respaldo'),
+    #path('cronlog/', views.cron_log_view, name='cron_log_view'),
+    #path('ajax-cron-log/', views.ajax_cron_log, name='ajax_cron_log'),
+    path('captcha/', include('captcha.urls')),
+    path("login/", views.login_view, name="login"),
+    path("verificar-otp/", views.otp_verification_view, name="otp_verification"),
 ]

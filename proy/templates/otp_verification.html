@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block contenido %}
+<div class="container">
+    <h2>Verificación de OTP</h2>
+    <form method="post">
+        {% csrf_token %}
+        <div class="form-group">
+            <label for="otp">Código OTP</label>
+            <input type="text" name="otp" class="form-control" required>
+        </div>
+        <button type="submit" class="btn btn-primary mt-2">Verificar</button>
+    </form>
+</div>
+{% endblock %}

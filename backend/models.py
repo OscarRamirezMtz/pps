@@ -2,6 +2,8 @@ from django.db import models
 
 # Create your models here.
 from django.contrib.auth.models import User
+from django.utils import timezone
+from datetime import timedelta
 
 class Server1(models.Model):
     nombre = models.CharField(max_length=100)
@@ -14,11 +16,19 @@ class Server1(models.Model):
     def __str__(self):
         return self.nombre
 
+class OTPCode(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    code = models.CharField(max_length=10)
+    creado = models.DateTimeField(auto_now_add=True)
 
-class BackupConfig(models.Model):
-    server_destino = models.ForeignKey(Server1, on_delete=models.CASCADE, related_name='respaldos_destino')
-    server_remitente = models.ForeignKey(Server1, on_delete=models.CASCADE, related_name='respaldos_remitente')
-    directorio_origen = models.CharField(max_length=255)
-    directorio_destino = models.CharField(max_length=255)
-    periodicidad = models.CharField(max_length=50)
-    comment = models.CharField(max_length=100, blank=True, null=True)
+    def is_expired(self):
+        return timezone.now() > self.creado + timedelta(minutes=5)
+    
+
+class OTPIntento(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='otp_attempt')
+    intentos = models.IntegerField(default=0)
+    bloqueado = models.DateTimeField(null=True, blank=True)
+
+    def is_locked(self):
+        return self.bloqueado and self.bloqueado > timezone.now()

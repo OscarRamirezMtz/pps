@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'backend',
     'captcha',
+    'autenticacion',
 ]
 
 MIDDLEWARE = [
@@ -58,7 +59,8 @@ ROOT_URLCONF = 'proy.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-         'DIRS': [BASE_DIR.joinpath('proy/templates')],
+#         'DIRS': [BASE_DIR.joinpath('backend/templates')],
+          'DIRS': [BASE_DIR / 'backend' / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -140,4 +142,3 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 SESSION_COOKIE_AGE = 600
 LOGIN_URL = '/login/'
-
