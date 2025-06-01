@@ -1,0 +1,85 @@
+{% extends "base2.html" %}
+{% load static %}
+
+{% block titulo %}{{ titulo|default:"Mis Servidores" }}{% endblock %}
+
+{% block scripts %}
+    <script src="{% static 'js/fade_errors.js' %}"></script>
+{% endblock %}
+
+{% block encabezado %}
+    {{ titulo|default:"Mis Servidores Registrados" }}
+{% endblock %}
+
+{% block contenido %}
+<div class="container">
+    <h2 class="mt-5 mb-3">{{ titulo|default:"Listado de Servidores" }}</h2>
+
+    {% if messages %}
+        <div class="messages mb-3">
+            {% for message in messages %}
+                <div class="alert {% if message.tags == 'error' %}alert-danger{% elif message.tags == 'success' %}alert-success{% elif message.tags == 'info' %}alert-info{% else %}alert-secondary{% endif %} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="mb-3">
+        <a href="{% url 'servidor_crear' %}" class="btn btn-primary">
+            <i class="bi bi-plus-lg"></i> Registrar Nuevo Servidor
+        </a>
+    </div>
+
+    {% if servidores %}
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Dirección (IP/Dominio)</th>
+                        <th>Usuario Remoto</th>
+                        <th>Puerto SSH</th>
+                        <th>Clave SSH Configurada</th>
+                        <th>Registrado por</th>
+                        <th>Fecha Registro</th>
+                        <th style="min-width: 220px;">Acciones</th> {# Ancho mínimo para los botones #}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for servidor in servidores %}
+                        <tr>
+                            <td>
+                                <a href="{% url 'servidor_detalle' servidor_pk=servidor.pk %}" title="Ver detalles y gestionar servicios de {{ servidor.nombre }}">{{ servidor.nombre }}</a>
+                            </td>
+                            <td>{{ servidor.direccion_host }}</td>
+                            <td>{{ servidor.usuario_remoto }}</td>
+                            <td>{{ servidor.ssh_port }}</td>
+                            <td>{% if servidor.clave_ssh_configurada %}<span class="badge bg-success">Sí</span>{% else %}<span class="badge bg-warning text-dark">No</span>{% endif %}</td>
+                            <td>{{ servidor.registrado_por.username|default:"N/A" }}</td>
+                            <td>{{ servidor.fecha_registro|date:"d/m/Y H:i" }}</td>
+                            <td>
+                                <a href="{% url 'servidor_detalle' servidor_pk=servidor.pk %}" class="btn btn-sm btn-info" title="Gestionar Servicios de {{ servidor.nombre }}">
+                                    <i class="bi bi-sliders"></i> Gestionar Servicios
+                                </a>
+                                {# <a href="{% url 'servidor_editar' pk=servidor.pk %}" class="btn btn-sm btn-outline-primary ms-1" title="Editar {{ servidor.nombre }}"><i class="bi bi-pencil-square"></i></a> #}
+                                
+                                <form method="post" action="{% url 'servidor_eliminar' pk=servidor.pk %}" style="display: inline;" onsubmit="return confirm('¿Estás seguro de que deseas eliminar el servidor \'{{ servidor.nombre|escapejs }}\'? Esta acción no se puede deshacer.');">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-danger ms-1" title="Eliminar {{ servidor.nombre }}">
+                                        <i class="bi bi-trash-fill"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="alert alert-info mt-4" role="alert">
+            No hay servidores registrados todavía. ¡Comienza <a href="{% url 'servidor_crear' %}" class="alert-link">registrando uno nuevo</a>!
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

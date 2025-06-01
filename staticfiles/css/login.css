@@ -1,5 +1,5 @@
 /* login.css */
-
+/*
 body {
     display: flex;
     align-items: center;
@@ -7,15 +7,57 @@ body {
     height: 100vh;
     margin: 0;
     background-color: #f8f9fa; /* Cambia el color de fondo según tus preferencias */
+/*}
+/*
+.login-container {
+    width: 400px; /* Ajusta el ancho del contenedor según tus preferencias */
+/*    padding: 20px;
+    border: 1px solid #ced4da; /* Cambia el color del borde según tus preferencias */
+/*    border-radius: 8px;
+    background-color: #fff; /* Cambia el color de fondo del contenedor según tus preferencias */
+/*}
+/* 
+/* En tu archivo static/css/login.css o en un bloque <style> en base.html/login.html */
+
+/* Asegúrate de que el contenedor padre pueda ocupar altura, por ejemplo el body o un wrapper */
+body, html {
+    height: 100%; /* Opcional, dependiendo de tu estructura general */
+}
+
+/* Si login-container está directamente en body o un wrapper que ocupa toda la altura */
+body { /* O el selector de tu wrapper principal, ej: .main-content-area */
+    display: flex;
+    flex-direction: column; /* Si tienes header/footer además del login */
+    align-items: center;
+    justify-content: center; /* Centra el contenido verticalmente */
+    min-height: 100vh; /* Mínimo la altura de la ventana */
+    padding-top: 20px; /* Espacio arriba */
+    padding-bottom: 20px; /* Espacio abajo */
 }
 
 .login-container {
-    width: 400px; /* Ajusta el ancho del contenedor según tus preferencias */
-    padding: 20px;
-    border: 1px solid #ced4da; /* Cambia el color del borde según tus preferencias */
+    width: 100%;
+    max-width: 500px; /* Ajusta el ancho máximo del formulario */
+    padding: 25px;
+    background-color: #f7f7f7; /* Un color de fondo suave */
     border-radius: 8px;
-    background-color: #fff; /* Cambia el color de fondo del contenedor según tus preferencias */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Una sombra sutil */
+    /* Si el padre no es flex con justify-content: center, puedes usar: */
+    /* margin: auto; */ /* Esto funciona si el padre no es flex y login-container tiene un width */
 }
 
-/* Puedes agregar más estilos según sea necesario */
+/* Ajustes adicionales para los elementos del formulario si es necesario */
+.login-container h2 {
+    margin-bottom: 25px; /* Más espacio debajo del título */
+    color: #333;
+}
 
+.login-container .form-group {
+    margin-bottom: 20px; /* Espacio entre grupos de formulario */
+}
+
+.login-container .btn-primary {
+    padding: 10px 20px;
+    border: none;
+    /* background-color: #007bff; Ya lo pone Bootstrap */
+}

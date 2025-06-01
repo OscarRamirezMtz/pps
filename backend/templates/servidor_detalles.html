@@ -1,0 +1,120 @@
+{% extends "base2.html" %}
+{% load static %}
+
+{% block titulo %}{{ titulo }}{% endblock %}
+
+{% block encabezado %}{{ titulo }}{% endblock %}
+
+{% block contenido %}
+<div class="container">
+    <h2 class="mt-5 mb-3">Detalles del Servidor: {{ servidor.nombre }}</h2>
+
+    {% if messages %}
+        <div class="messages mb-3">
+            {% for message in messages %}
+                <div class="alert {% if message.tags == 'error' %}alert-danger{% elif message.tags == 'success' %}alert-success{% else %}alert-info{% endif %} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="card mb-4">
+        <div class="card-header">
+            Información del Servidor
+        </div>
+        <div class="card-body">
+            <p><strong>Nombre:</strong> {{ servidor.nombre }}</p>
+            <p><strong>Dirección (IP/Dominio):</strong> {{ servidor.direccion_host }}</p>
+            <p><strong>Usuario Remoto SSH:</strong> {{ servidor.usuario_remoto }}</p>
+            <p><strong>Puerto SSH:</strong> {{ servidor.ssh_port }}</p>
+            <p><strong>¿Clave SSH Configurada?:</strong> {% if servidor.clave_ssh_configurada %}Sí{% else %}No{% endif %}</p>
+            <p><strong>Registrado por:</strong> {{ servidor.registrado_por.username|default:"N/A" }}</p>
+            <p><strong>Fecha de Registro:</strong> {{ servidor.fecha_registro|date:"d/m/Y H:i:s" }}</p>
+            <p><strong>Última Modificación:</strong> {{ servidor.ultima_modificacion|date:"d/m/Y H:i:s" }}</p>
+            {% if servidor.detalles_adicionales %}
+                <p><strong>Detalles Adicionales:</strong> {{ servidor.detalles_adicionales|linebreaksbr }}</p>
+            {% endif %}
+            {# Botón para editar servidor (cuando implementes la vista) #}
+            {# <a href="{% url 'servidor_editar' pk=servidor.pk %}" class="btn btn-sm btn-outline-primary">Editar Servidor</a> #}
+        </div>
+    </div>
+
+    <hr>
+
+    <h3 class="mt-4 mb-3">Servicios Configurados en {{ servidor.nombre }}</h3>
+    <div class="mb-3">
+        <a href="{% url 'servicio_configurar_crear' servidor_pk=servidor.pk %}" class="btn btn-primary">Configurar Nuevo Servicio</a>
+    </div>
+
+    {% if servicios %}
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Nombre del Servicio</th>
+                        <th>Descripción</th>
+                        <th>Estado Conocido</th>
+                        <th>Puerto</th>
+                        <th>Gestión Habilitada</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for servicio in servicios %}
+                        <tr>
+                            <td>{{ servicio.nombre_servicio_remoto }}</td>
+                            <td>{{ servicio.descripcion_personalizada|truncatewords:10|default:"N/A" }}</td>
+                            <td>
+                                <span class="badge 
+                                    {% if servicio.estado_conocido == 'activo' %}bg-success
+                                    {% elif servicio.estado_conocido == 'inactivo' %}bg-danger
+                                    {% elif servicio.estado_conocido == 'desconocido' %}bg-secondary
+                                    {% elif servicio.estado_conocido == 'error_verificacion' %}bg-warning text-dark
+                                    {% else %}bg-info text-dark{% endif %}">
+                                    {{ servicio.get_estado_conocido_display }}
+                                </span>
+                            </td>
+                            <td>{{ servicio.puerto_monitorizar|default:"N/A" }}</td>
+                            <td>{% if servicio.habilitado_para_gestion %}Sí{% else %}No{% endif %}</td>
+                            <td>
+                                {% if servicio.habilitado_para_gestion %}
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <form method="post" action="{% url 'servicio_accion' servicio_pk=servicio.pk accion='levantar' %}" style="display: inline;">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-success" title="Levantar Servicio">▲</button>
+                                        </form>
+                                        <form method="post" action="{% url 'servicio_accion' servicio_pk=servicio.pk accion='bajar' %}" style="display: inline;">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-danger" title="Bajar Servicio">▼</button>
+                                        </form>
+                                        <form method="post" action="{% url 'servicio_accion' servicio_pk=servicio.pk accion='reiniciar' %}" style="display: inline;">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-warning" title="Reiniciar Servicio">↻</button>
+                                        </form>
+                                    </div>
+                                {% endif %}
+                                <form method="post" action="{% url 'servicio_accion' servicio_pk=servicio.pk accion='verificar_estado' %}" style="display: inline;" class="ms-1">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-secondary" title="Verificar Estado">?</button>
+                                </form>
+                                {# Enlace para editar configuración del servicio (cuando lo implementes) #}
+                                {# <a href="{% url 'servicio_configurar_editar' pk=servicio.pk %}" class="btn btn-sm btn-outline-primary ms-1">Editar Conf.</a> #}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="alert alert-info" role="alert">
+            No hay servicios configurados para este servidor todavía.
+        </div>
+    {% endif %}
+
+    <div class="mt-4">
+        <a href="{% url 'servidor_listar' %}" class="btn btn-outline-secondary">Volver a la Lista de Servidores</a>
+    </div>
+
+</div>
+{% endblock %}

@@ -6,7 +6,28 @@
     <script src="{% static 'js/fade_errors.js' %}"></script>
 {% endblock %}
 
+{% block estilos %}
+    {# Añadimos un bloque de estilos aquí o puedes poner esto en tu login.css #}
+    <style>
+        .captcha-container img.captcha { /* Selector para la imagen del captcha */
+            display: block; /* Hace que la imagen ocupe su propia línea */
+            margin-bottom: 10px; /* Espacio entre la imagen y el campo de texto debajo */
+        }
 
+        .captcha-container input[type="text"] { /* Selector para el campo de texto del captcha */
+            display: inline-block; /* Permite que el botón de refresco esté al lado */
+            vertical-align: middle; /* Alinea verticalmente con el botón */
+            width: calc(100% - 50px); /* Ajusta el ancho para dejar espacio al botón, puedes modificarlo */
+            max-width: 200px; /* Un ancho máximo para el campo de texto */
+        }
+
+        .captcha-container .refresh-captcha {
+            display: inline-block;
+            vertical-align: middle; /* Alinea con el campo de texto */
+            margin-left: 5px;
+        }
+    </style>
+{% endblock %}
 
 {% block contenido %}
     {% if messages %}
@@ -18,71 +39,85 @@
             {% endfor %}
         </div>
     {% endif %}
-    <link rel="stylesheet" type="text/css" href="{% static 'css/login.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'css/login.css' %}"> {# Tu CSS principal para el login #}
     
-    <div class="login-container">
-        <h2 class="mt-5 text-center">¡Bienvenido de nuevo!</h2>
-        <form method="post" class="mt-4">
-            {% csrf_token %}
-            
-            {% if form.non_field_errors %}
-                <div class="alert alert-danger text-center">
-                    {% for error in form.non_field_errors %}
-                        {{ error }}
-                    {% endfor %}
-                </div>
-            {% endif %}
-            
-            <div class="form-group row">
-                <label for="{{ form.username.id_for_label }}" class="col-sm-3 col-form-label">Usuario</label>
-                <div class="col-sm-9">
-                    {{ form.username }}
-                    {% if form.username.errors %}
-                        {% for error in form.username.errors %}
-                            <div class="alert alert-danger mt-2">
-                                {{ error }}
-                            </div>
+    {# Contenedor para centrar el formulario #}
+    <div class="d-flex align-items-center justify-content-center" style="min-height: 80vh;">
+        <div class="login-container">
+            <h2 class="mt-5 text-center">¡Bienvenido de nuevo!</h2>
+            <form method="post" class="mt-4">
+                {% csrf_token %}
+                
+                {% if form.non_field_errors %}
+                    <div class="alert alert-danger text-center">
+                        {% for error in form.non_field_errors %}
+                            {{ error }}
                         {% endfor %}
-                    {% endif %}
+                    </div>
+                {% endif %}
+                
+                <div class="form-group row mb-3">
+                    <label for="{{ form.username.id_for_label }}" class="col-sm-3 col-form-label">Usuario</label>
+                    <div class="col-sm-9">
+                        {{ form.username }}
+                        {% if form.username.errors %}
+                            {% for error in form.username.errors %}
+                                <div class="text-danger mt-1"><small>{{ error }}</small></div>
+                            {% endfor %}
+                        {% endif %}
+                    </div>
                 </div>
-            </div>
-            
-            <div class="form-group row">
-                <label for="{{ form.password.id_for_label }}" class="col-sm-3 col-form-label">Contraseña</label>
-                <div class="col-sm-9">
-                    {{ form.password }}
-                    {% if form.password.errors %}
-                        {% for error in form.password.errors %}
-                            <div class="alert alert-danger mt-2">
-                                {{ error }}
-                            </div>
-                        {% endfor %}
-                    {% endif %}
+                
+                <div class="form-group row mb-3">
+                    <label for="{{ form.password.id_for_label }}" class="col-sm-3 col-form-label">Contraseña</label>
+                    <div class="col-sm-9">
+                        {{ form.password }}
+                        {% if form.password.errors %}
+                            {% for error in form.password.errors %}
+                                <div class="text-danger mt-1"><small>{{ error }}</small></div>
+                            {% endfor %}
+                        {% endif %}
+                    </div>
                 </div>
-            </div>
-            <div class="form-group row">
-                <label class="col-sm-3 col-form-label">Captcha</label>
-                <div class="col-sm-9">
-                    {{ form.captcha }}
-                    {% if form.captcha.errors %}
-                        {% for error in form.captcha.errors %}
-                            <div class="alert alert-danger mt-2">
-                                {{ error }}
-                            </div>
-                        {% endfor %}
-                    {% endif %}
-                </div>
-            </div>
-            
 
-            <div class="form-group row">
-                <div class="col-sm-12 text-center">
-                    <button type="submit" class="btn btn-primary">Acceder</button>
+                <div class="form-group row mb-3">
+                    <label class="col-sm-3 col-form-label">Captcha</label>
+                    <div class="col-sm-9">
+                        <div class="captcha-container"> {# Contenedor específico para el captcha y su botón #}
+                            {{ form.captcha }} {# Esto renderiza la imagen, el input oculto y el input de texto #}
+                            <button type="button" class="btn btn-sm btn-outline-secondary refresh-captcha" title="Refrescar CAPTCHA">
+                                &#x21bb; {# Símbolo de refresco (↻) #}
+                            </button>
+                        </div>
+                         {% if form.captcha.errors %}
+                            {% for error in form.captcha.errors %}
+                                <div class="text-danger mt-1"><small>{{ error }}</small></div>
+                            {% endfor %}
+                        {% endif %}
+                    </div>
                 </div>
-            </div>
-        </form>
-        
- 
+                
+                <div class="form-group row mt-4">
+                    <div class="col-sm-12 text-center">
+                        <button type="submit" class="btn btn-primary">Acceder</button>
+                    </div>
+                </div>
+            </form>
+        </div>
     </div>
-{% endblock %}
 
+    {# Script para refrescar el captcha (ya lo tenías, se queda igual) #}
+    <script type="text/javascript">
+    $(document).ready(function(){
+        $('.refresh-captcha').on('click', function(e){
+            e.preventDefault();
+            $.getJSON("/captcha/refresh/", function(json) {
+                $('#id_captcha_0').val(json.key);
+                $('img.captcha').attr('src', json.image_url);
+                $('#id_captcha_1').val(''); // Limpiar el campo de texto
+            });
+            return false;
+        });
+    });
+    </script>
+{% endblock %}

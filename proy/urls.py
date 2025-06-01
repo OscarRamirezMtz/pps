@@ -36,4 +36,11 @@ urlpatterns = [
     path('captcha/', include('captcha.urls')),
     path("login/", views.login_view, name="login"),
     path("verificar-otp/", views.otp_verification_view, name="otp_verification"),
+    path('servidores/', views.servidor_listar, name='servidor_listar'),
+    path('servidores/registrar/', views.servidor_crear, name='servidor_crear'),
+    path('servidores/<int:pk>/eliminar/', views.servidor_eliminar, name='servidor_eliminar'),
+    path('servidores/<int:servidor_pk>/detalle/', views.servidor_detalle, name='servidor_detalle'),
+    path('servidores/<int:servidor_pk>/servicios/configurar/', views.servicio_configurar_crear, name='servicio_configurar_crear'),
+    path('servicios/<int:servicio_pk>/accion/<str:accion>/', views.servicio_accion, name='servicio_accion'),
+
 ]

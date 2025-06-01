@@ -19,56 +19,89 @@ from django.views.decorators.http import require_http_methods
 from backend.models import (
     OTPIntento,
     OTPCode,
-    Server1,
+    Servidor,
+    ServicioConfigurado
 )
-from backend.forms import LoginForm, FormServ, FormSend
-from backend.utils import generate_otp, mandar_mensaje
+from backend.forms import (
+    LoginForm,  
+    ServidorForm, 
+#    FormSend, 
+    ServicioConfiguradoForm
+)
+from backend.utils import (
+    generate_otp, 
+    mandar_mensaje, 
+    ejecutar_comando_ssh
+)
 
-MAX_OTP_INTENTOS     = 3
-MINUTOS_BLOQUEADO = 1
+MAX_OTP_INTENTOS = 3
+SEGUNDOS_BLOQUEO = 30
 User = get_user_model()
+
+
+def ip_cliente(request):
+    """
+    obtiene la direccion ip del cliente
+    """
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        ip = x_forwarded_for.split(',')[0]
+    else:
+        ip = request.META.get('REMOTE_ADDR')
+    return ip
 
 
 @require_http_methods(["GET", "POST"])
 def login_view(request):
     """
     Primera fase del login:
-    1. Valida usuario y contraseña
-    2. Si son correctos, genera OTP y redirige a verificación
+    Valida user y contraseña
+    si son correctos, genera OTP y redirige a verificación
     """
     form = LoginForm(request.POST or None)
-
+    direccion_cliente = ip_cliente(request)
+#
     if request.method == "POST" and form.is_valid():
-        user = User.objects.filter(username=form.cleaned_data["username"]).first()
-        if not user:
+        user_obj = User.objects.filter(username=form.cleaned_data["username"]).first()
+        if not user_obj:
             messages.error(request, "Credenciales inválidas.")
             return redirect("login")
 
-        intento, _ = OTPIntento.objects.get_or_create(user=user)
+        intento, created = OTPIntento.objects.get_or_create(
+            user=user_obj,
+            direccion_ip=direccion_cliente,
+            defaults={'intentos': 0, 'bloqueado': None}
+        )
+#intento
+        if intento.bloqueado and timezone.now() >= intento.bloqueado:
+            intento.intentos = 0
+            intento.bloqueado = None
+            intento.save()
 
         if intento.bloqueado and timezone.now() < intento.bloqueado:
-            minutos = math.ceil((intento.bloqueado - timezone.now()).total_seconds() / 60)
-            messages.error(request, f"Usuario bloqueado. Intenta en {minutos} minuto(s).")
+            intento.bloqueado = timezone.now() + timedelta(seconds=SEGUNDOS_BLOQUEO)
+            intento.save()
+            messages.error(request, f"Esta IP sigue bloqueada. el tiempo de bloqueo se ha reiniciado a {SEGUNDOS_BLOQUEO} segundos debido a un nuevo intento.")
             return redirect("login")
 
-        if authenticate(request, username=user.username, password=form.cleaned_data["password"]):
-            # contraseña correcta, genera OTP y salta al paso 2
-            request.session["preauth_user_id"] = user.id
-            code = generate_otp()
-            OTPCode.objects.create(user=user, code=code)
-            mandar_mensaje(f"Tu código OTP es: `{code}`\nCaduca en 5 min.")
+        if authenticate(request, username=user_obj.username, password=form.cleaned_data["password"]):
+            request.session["preauth_user_id"] = user_obj.id
+            codigo_otp_generado = generate_otp()
+
+            OTPCode.objects.filter(user=user_obj).delete()
+            OTPCode.objects.create(user=user_obj, codigo=codigo_otp_generado)
+            mandar_mensaje(f"Tu código OTP es: `{codigo_otp_generado}`\nCaduca en 1 min.")
             return redirect("otp_verification")
-
-
-        intento.intentos += 1
-        if intento.intentos >= MAX_OTP_INTENTOS:
-            intento.bloqueado = timezone.now() + timedelta(minutes=MINUTOS_BLOQUEADO)
-            messages.error(request, f"Demasiados intentos. Usuario bloqueado por {MINUTOS_BLOQUEADO} min.")
         else:
-            restantes = MAX_OTP_INTENTOS - intento.intentos
-            messages.error(request, f"Contraseña incorrecta. Te quedan {restantes} intento(s).")
-        intento.save()
-        return redirect("login")
+            intento.intentos += 1
+            if intento.intentos >= MAX_OTP_INTENTOS:
+                intento.bloqueado = timezone.now() + timedelta(seconds=SEGUNDOS_BLOQUEO)
+                messages.error(request, f"Demasiados intentos fallidos desde esta IP. usuario bloqueado por {SEGUNDOS_BLOQUEO} segundos.")
+            else:
+                restantes = MAX_OTP_INTENTOS - intento.intentos
+                messages.error(request, f"Contraseña incorrecta. Te quedan {restantes} intento(s).")
+            intento.save()
+            return redirect("login")
 
     return render(request, "login.html", {"form": form})
 
@@ -80,37 +113,57 @@ def otp_verification_view(request):
     """
     uid = request.session.get("preauth_user_id")
     if not uid:
-        messages.error(request, "Sesión inválida. Vuelve a iniciar sesión.")
+        messages.error(request, "Sesión inválida. vuelve a iniciar sesion.")
         return redirect("login")
 
-    user = get_object_or_404(User, pk=uid)
-    intento, _ = OTPIntento.objects.get_or_create(user=user)
+    user_obj = get_object_or_404(User, pk=uid)
+    direccion_cliente = ip_cliente(request)
+
+    try:
+        intento = OTPIntento.objects.get(user=user_obj, direccion_ip=direccion_cliente)
+    except OTPIntento.DoesNotExist:
+        intento, created = OTPIntento.objects.get_or_create(
+            user=user_obj,
+            direccion_ip=direccion_cliente,
+            defaults={'intentos': 0, 'bloqueado': None}
+        )
+
+    if intento.bloqueado and timezone.now() >= intento.bloqueado:
+        intento.intentos = 0
+        intento.bloqueado = None
+        intento.save()
 
     if intento.bloqueado and timezone.now() < intento.bloqueado:
-        mins = math.ceil((intento.bloqueado - timezone.now()).total_seconds() / 60)
-        messages.error(request, f"Usuario bloqueado. Intenta en {mins} minuto(s).")
+        intento.bloqueado = timezone.now() + timedelta(seconds=SEGUNDOS_BLOQUEO)
+        intento.save()
+        messages.error(request, f"Esta IP sigue bloqueada. el tiempo de bloqueo se ha reiniciado a {SEGUNDOS_BLOQUEO} segundos debido a un nuevo intento.")
+        request.session.pop("preauth_user_id", None)
         return redirect("login")
-
+#validacion de otp
     if request.method == "POST":
-        otp = request.POST.get("otp", "").strip()
-        codigo = OTPCode.objects.filter(user=user).order_by("-creado").first()
+        otp_ingresado = request.POST.get("otp", "").strip()
+        codigo_otp_guardado = OTPCode.objects.filter(user=user_obj).order_by("-creado").first()
 
-        es_valido = codigo and not codigo.expirado() and codigo.code == otp
+        es_valido = codigo_otp_guardado and \
+                    not codigo_otp_guardado.expirado() and \
+                    codigo_otp_guardado.codigo == otp_ingresado
+# si es incorrecto se aumentan los intentos, 
         if not es_valido:
             intento.intentos += 1
             if intento.intentos >= MAX_OTP_INTENTOS:
-                intento.bloqueado = timezone.now() + timedelta(minutes=MINUTOS_BLOQUEADO)
-                messages.error(request, f"Demasiados intentos. Usuario bloqueado por {MINUTOS_BLOQUEADO} min.")
+                intento.bloqueado = timezone.now() + timedelta(seconds=SEGUNDOS_BLOQUEO)
+                messages.error(request, f"Demasiados intentos fallidos (OTP incorrecto). Usuario bloqueado para esta IP por {SEGUNDOS_BLOQUEO} segundos.")
             else:
                 restantes = MAX_OTP_INTENTOS - intento.intentos
-                messages.error(request, f"OTP incorrecto. Te quedan {restantes} intento(s).")
+                messages.error(request, f"OTP incorrecto. Te quedan {restantes} intento(s) en total desde esta IP.")
             intento.save()
+            request.session.pop("preauth_user_id", None)
             return redirect("login")
-
-        # OTP correcto
+#login completo se reinician los intentos y se redirige al index
         intento.delete()
-        auth_login(request, user)
+        auth_login(request, user_obj)
         request.session.pop("preauth_user_id", None)
+        OTPCode.objects.filter(user=user_obj).delete()
         return redirect("index")
 
     return render(request, "otp_verification.html")
@@ -135,15 +188,15 @@ def _check_ping(ip: str) -> bool:
         return False
 
 
-def _ssh_user_exists(ip: str, usuario: str) -> bool:
+def _ssh_user_exists(ip: str, user: str) -> bool:
     """
-    Comprueba que `usuario@ip` sea un login SSH válido
+    Comprueba que `user@ip` sea un login SSH válido
     (suponemos que la clave pública ya está cargada).
     """
     try:
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        ssh.connect(ip, username=usuario, timeout=5)
+        ssh.connect(ip, username=user, timeout=5)
         ssh.close()
         return True
     except (paramiko.AuthenticationException, paramiko.SSHException):
@@ -155,23 +208,23 @@ def _ssh_user_exists(ip: str, usuario: str) -> bool:
 def add_server(request):
     success = None
     form = FormServ(request.POST or None)
-    form.set_usuario(request.user)          # añade automáticamente avala
+    form.set_user(request.user)          # añade automáticamente avala
 
     if request.method == "POST" and form.is_valid():
         nombre  = form.cleaned_data["nombre"]
         ip      = form.cleaned_data["ip"]
-        uremoto = form.cleaned_data["usuario_remoto"]
+        uremoto = form.cleaned_data["user_remoto"]
 
         if not _check_ping(ip):
             messages.error(request, "Servidor inaccesible (ping fallido).")
         elif not _ssh_user_exists(ip, uremoto):
-            messages.error(request, f'El usuario remoto "{uremotо}" no existe o no tiene acceso SSH.')
+            messages.error(request, f'El user remoto "{uremotо}" no existe o no tiene acceso SSH.')
         else:
             Server1.objects.create(
                 nombre=nombre,
                 ip=ip,
                 avala=request.user,
-                usuario_remoto=uremotо,
+                user_remoto=uremotо,
                 detalles="Alta exitosa",
             )
             success = "Servidor guardado con éxito."
@@ -189,3 +242,216 @@ def list_servers(request):
 @login_required(login_url='/login/')
 def index(request):
      return render(request, 'index.html')
+
+
+def _check_ping(host_address: str) -> bool:
+    try:
+        # Para dominios, ping podría no ser la mejor prueba de "accesibilidad" para SSH,
+        # pero puede ser un primer filtro.
+        subprocess.check_output(["ping", "-c", "1", host_address])
+        return True
+    except subprocess.CalledProcessError:
+        return False
+    except FileNotFoundError: # Si ping no está instalado o en el PATH
+        messages.warning(request, "Comando 'ping' no encontrado. Saltando verificación de ping.")
+        return True # O False, dependiendo de cómo quieras manejar esto
+
+
+def _ssh_user_exists(host_address: str, user: str, port: int = 22) -> bool:
+    """
+    Comprueba que `user@host_address:port` sea un login SSH válido
+    (suponemos que la clave pública ya está cargada o se manejará la autenticación).
+    """
+    try:
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        # Usar el puerto del formulario o el por defecto del modelo Servidor
+        ssh.connect(host_address, port=port, username=user, timeout=5)
+        ssh.close()
+        return True
+    except (paramiko.AuthenticationException, paramiko.SSHException, TimeoutError, paramiko.ssh_exception.NoValidConnectionsError) as e:
+        return False
+
+
+@require_http_methods(["GET", "POST"])
+@login_required(login_url="login")
+def servidor_crear(request): # Renombrada de add_server para claridad
+    if request.method == "POST":
+        form = ServidorForm(request.POST)
+        if form.is_valid():
+            # Antes de guardar, asignamos el usuario que registra
+            servidor_instance = form.save(commit=False)
+            servidor_instance.registrado_por = request.user
+            
+            # Validaciones adicionales antes de guardar definitivamente
+            host = servidor_instance.direccion_host
+            usuario_ssh = servidor_instance.usuario_remoto
+            puerto_ssh = servidor_instance.ssh_port
+
+            # Podrías hacer el ping aquí, pero _ssh_user_exists es más crítico
+            # if not _check_ping(host):
+            #     messages.error(request, f"Servidor en '{host}' inaccesible (ping fallido).")
+            # el form.save() abajo disparará la creación, así que el mensaje de error debe prevenir esto
+            if not servidor_instance.clave_ssh_configurada:
+                 # Si la clave no está configurada, al menos verificamos que el usuario/puerto/host sea alcanzable
+                 # y el usuario exista. La clave se configurará después.
+                if not _ssh_user_exists(host, usuario_ssh, puerto_ssh):
+                    messages.error(request, f"No se pudo conectar o el usuario '{usuario_ssh}' no existe/no tiene acceso SSH en '{host}:{puerto_ssh}'. Verifica los datos o configura la clave SSH manualmente y marca la casilla.")
+                    # No guardamos si la conexión SSH falla y la clave no está marcada como configurada
+                else:
+                    servidor_instance.save()
+                    messages.success(request, f"Servidor '{servidor_instance.nombre}' registrado con éxito. Recuerda configurar la clave SSH si aún no lo has hecho.")
+                    return redirect('servidor_listar') # Redirigir a la lista de servidores
+            else: # Si el usuario marcó que la clave ya está configurada
+                servidor_instance.save()
+                messages.success(request, f"Servidor '{servidor_instance.nombre}' registrado con éxito.")
+                return redirect('servidor_listar') # Redirigir a la lista de servidores
+    else:
+        form = ServidorForm()
+
+    context = {"form": form, "titulo": "Registrar Nuevo Servidor"}
+    return render(request, "servidor_form.html", context) # Asumiendo un template
+
+def servidor_listar(request): # Renombrada de list_servers
+    servidores = Servidor.objects.filter(registrado_por=request.user) # O todos: Servidor.objects.all()
+    context = {"servidores": servidores, "titulo": "Mis Servidores Registrados"}
+    return render(request, "servidor_listar.html", context) # Asumiendo un template
+
+def servidor_eliminar(request, pk):
+    # Obtener el servidor o devolver un 404 si no existe
+    # Asegurarse de que el servidor pertenezca al usuario actual o que sea un superusuario
+    # por seguridad, para que un usuario no pueda eliminar servidores de otro.
+    servidor = get_object_or_404(Servidor, pk=pk)
+
+    # Opcional: Comprobación de permisos más granular
+    # if servidor.registrado_por != request.user and not request.user.is_superuser:
+    #     messages.error(request, "No tienes permiso para eliminar este servidor.")
+    #     return redirect('servidor_listar') # O a alguna página de error
+
+    try:
+        nombre_servidor = servidor.nombre
+        servidor.delete()
+        messages.success(request, f"El servidor '{nombre_servidor}' ha sido eliminado correctamente.")
+    except Exception as e:
+        messages.error(request, f"Ocurrió un error al intentar eliminar el servidor: {e}")
+    
+    return redirect('servidor_listar') # Redirigir de vuelta a la lista de servidores
+
+@login_required(login_url="login")
+def servidor_detalle(request, servidor_pk):
+    servidor = get_object_or_404(Servidor, pk=servidor_pk)
+    # Opcional: Verificar permisos si el servidor no debe ser visible para todos los admins
+    # if servidor.registrado_por != request.user and not request.user.is_superuser:
+    #     messages.error(request, "No tienes permiso para ver este servidor.")
+    #     return redirect('servidor_listar')
+        
+    servicios = ServicioConfigurado.objects.filter(servidor=servidor)
+    context = {
+        'servidor': servidor,
+        'servicios': servicios,
+        'titulo': f"Detalles de {servidor.nombre}"
+    }
+    return render(request, 'servidor_detalles.html', context)
+
+@login_required(login_url="login")
+@require_http_methods(["GET", "POST"])
+def servicio_configurar_crear(request, servidor_pk):
+    servidor = get_object_or_404(Servidor, pk=servidor_pk)
+    # Opcional: Verificar permisos más estrictos si es necesario
+    if hasattr(servidor, 'registrado_por') and servidor.registrado_por != request.user and not request.user.is_superuser:
+        messages.error(request, "No tienes permiso para configurar servicios en este servidor.")
+        return redirect('servidor_detalle', servidor_pk=servidor_pk)
+
+    if request.method == "POST":
+        # CORRECCIÓN 1: Usar ServicioConfiguradoForm
+        form = ServicioConfiguradoForm(request.POST)
+        if form.is_valid():
+            servicio = form.save(commit=False)
+            servicio.servidor = servidor
+            servicio.configurado_por = request.user
+            try:
+                servicio.save()
+                messages.success(request, f"Servicio '{servicio.nombre_servicio_remoto}' configurado exitosamente para '{servidor.nombre}'.")
+                # CORRECCIÓN 2: Nombre correcto de la URL de redirección
+                return redirect('servidor_detalle', servidor_pk=servidor.pk)
+            except Exception as e:
+                messages.error(request, f"Error al guardar la configuración del servicio: {e}")
+        else:
+            messages.error(request, "Por favor corrige los errores en el formulario.")
+    else:
+        # CORRECCIÓN 3: Usar ServicioConfiguradoForm() para instanciar en GET
+        form = ServicioConfiguradoForm()
+
+    context = {
+        'form': form,
+        'servidor': servidor,
+        'titulo': f"Configurar Nuevo Servicio en {servidor.nombre}"
+    }
+    # CORRECCIÓN 4: Ruta completa a la plantilla para claridad
+    return render(request, 'servicio_configurar_form.html', context)
+
+@login_required(login_url="login")
+@require_http_methods(["POST"])
+def servicio_accion(request, servicio_pk, accion):
+    servicio = get_object_or_404(ServicioConfigurado, pk=servicio_pk)
+    servidor = servicio.servidor
+
+    if hasattr(servidor, 'registrado_por') and servidor.registrado_por != request.user and not request.user.is_superuser:
+        messages.error(request, "No tienes permiso para ejecutar acciones en este servicio.")
+        return redirect('servidor_detalle', servidor_pk=servidor.pk)
+
+    if not servicio.habilitado_para_gestion:
+        messages.warning(request, f"La gestión para el servicio '{servicio.nombre_servicio_remoto}' está deshabilitada.")
+        return redirect('servidor_detalle', servidor_pk=servidor.pk)
+    
+    comando_a_ejecutar = ""
+    accion_exitosa = False 
+
+    if accion == 'levantar':
+        comando_a_ejecutar = servicio.comando_levantar or f"sudo systemctl start {servicio.nombre_servicio_remoto}"
+        messages.info(request, f"Simulando 'levantar' servicio: {servicio.nombre_servicio_remoto}. Comando: {comando_a_ejecutar}")
+        accion_exitosa = True 
+        servicio.estado_conocido = 'activo' 
+        
+    elif accion == 'bajar':
+        comando_a_ejecutar = servicio.comando_bajar or f"sudo systemctl stop {servicio.nombre_servicio_remoto}"
+        messages.info(request, f"Simulando 'bajar' servicio: {servicio.nombre_servicio_remoto}. Comando: {comando_a_ejecutar}")
+        accion_exitosa = True 
+        servicio.estado_conocido = 'inactivo'
+
+    elif accion == 'reiniciar':
+        comando_a_ejecutar = servicio.comando_reiniciar or f"sudo systemctl restart {servicio.nombre_servicio_remoto}"
+        messages.info(request, f"Simulando 'reiniciar' servicio: {servicio.nombre_servicio_remoto}. Comando: {comando_a_ejecutar}")
+        accion_exitosa = True
+        servicio.estado_conocido = 'activo'
+
+    elif accion == 'verificar_estado':
+        comando_a_ejecutar = servicio.comando_verificar_estado or f"sudo systemctl status {servicio.nombre_servicio_remoto}"
+        messages.info(request, f"Simulando 'verificar estado' de: {servicio.nombre_servicio_remoto}. Comando: {comando_a_ejecutar}")
+        accion_exitosa = True
+        # Aquí deberías obtener el estado real y actualizar 'servicio.estado_conocido'
+        # servicio.estado_conocido = 'desconocido' # Temporalmente
+        # Lógica de ejemplo para actualizar (necesitarías la salida real del comando):
+        # if "active (running)" in resultado_ssh.stdout:
+        #     servicio.estado_conocido = 'activo'
+        # elif "inactive (dead)" in resultado_ssh.stdout:
+        #     servicio.estado_conocido = 'inactivo'
+        # else:
+        #     servicio.estado_conocido = 'error_verificacion'
+
+    else:
+        messages.error(request, "Acción desconocida.")
+        return redirect('servidor_detalle', servidor_pk=servidor.pk)
+
+    if accion_exitosa: # O basado en el resultado real de la ejecución del comando SSH
+        # servicio.log_ultima_accion = resultado_ssh.stdout + "\n" + resultado_ssh.stderr # Log real
+        servicio.ultima_comprobacion_estado = timezone.now()
+        servicio.save()
+        messages.success(request, f"Acción '{accion}' (simulada) para '{servicio.nombre_servicio_remoto}' procesada.")
+    else:
+        messages.error(request, f"Falló la acción '{accion}' (simulada) para '{servicio.nombre_servicio_remoto}'.")
+        # servicio.log_ultima_accion = resultado_ssh.stdout + "\n" + resultado_ssh.stderr # Log real
+        # servicio.save()
+
+
+    return redirect('servidor_detalle', servidor_pk=servidor.pk)

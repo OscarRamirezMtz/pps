@@ -2,82 +2,104 @@
 <!DOCTYPE html>
 <html lang="es-MX">
     <head>
-        <title>{% block titulo %}{% endblock %}</title>
+        <title>{% block titulo %}Mi Plataforma de Servidores{% endblock %}</title>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.1/dist/css/bootstrap.min.css" rel="stylesheet">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
-            <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.1/dist/js/bootstrap.bundle.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.1/dist/js/bootstrap.bundle.min.js"></script>
         {% block scripts %}
-            
-            
-            {% endblock %}
+            {# Espacio para scripts específicos de cada página #}
+        {% endblock %}
         {% block estilos %}
-        <link rel="stylesheet" type="text/css" href="{% static 'css/base.css' %}">
-    {% endblock %}
+        <link rel="stylesheet" type="text/css" href="{% static 'css/base.css' %}"> {# Asumiendo que tienes un base.css #}
+        <style>
+            body { padding-top: 70px; } /* Ajuste para navbar fija, un poco más si la navbar es más alta */
+            .navbar { margin-bottom: 20px; }
+            .nav-link.active {
+                 font-weight: bold; /* O algún otro indicador visual */
+                 /* border-bottom: 2px solid #fff; /* Ejemplo de otro indicador para navbar oscura */
+            }
+        </style>
+        {% endblock %}
     </head>
 
 <body>
 
-<header class="container-fluid text-center pt-5 pb-3 mt-3 mb-3 rounded">
-    <h1 style="font-family: 'Helvetica Neue', sans-serif;">{% block encabezado %}{% endblock %}</h1>
+<header>
+    {% block navegacion %}
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="{% url 'index' %}">
+                <i class="bi bi-hdd-stack"></i>
+                Admin Servidores
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarSupportedContent">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'index' %}active{% endif %}" aria-current="page" href="{% url 'index' %}">
+                            <i class="bi bi-house-door-fill"></i> Inicio
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        {# Enlace directo para Ver Servidores #}
+                        <a class="nav-link {% if request.resolver_match.url_name == 'servidor_listar' or request.resolver_match.url_name == 'servidor_detalle' or request.resolver_match.url_name == 'servicio_configurar_crear' %}active{% endif %}" href="{% url 'servidor_listar' %}">
+                            <i class="bi bi-list-ul"></i> Ver Servidores
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        {# Enlace directo para Registrar Servidor #}
+                        <a class="nav-link {% if request.resolver_match.url_name == 'servidor_crear' %}active{% endif %}" href="{% url 'servidor_crear' %}">
+                            <i class="bi bi-plus-circle-fill"></i> Registrar Servidor
+                        </a>
+                    </li>
+                    {# SECCIÓN DE RESPALDOS YA FUE ELIMINADA #}
+                </ul>
+                <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
+                    {% if user.is_authenticated %}
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownUser" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="bi bi-person-circle"></i> {{ user.username }}
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdownUser">
+                                <li>
+                                    <a class="dropdown-item" href="{% url 'logout' %}">
+                                        <i class="bi bi-box-arrow-right"></i> Cerrar sesión
+                                    </a>
+                                </li>
+                            </ul>
+                        </li>
+                    {% else %}
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'login' %}active{% endif %}" href="{% url 'login' %}">
+                                <i class="bi bi-box-arrow-in-right"></i> Iniciar Sesión
+                            </a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </nav>
+    {% endblock %}
 </header>
 
-{% block navegacion %}
-<nav class="navbar navbar-expand-lg navbar-light">
-    <div class="container-fluid">
-        <a class="navbar-brand">SISTEMA DE REGISTRO</a>
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-        <div class="collapse navbar-collapse" id="navbarSupportedContent">
-            <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-                <li class="nav-item">
-                    <a class="nav-link" aria-current="page" href="/index/">Inicio</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="/alta/">Alta de servidores</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="/agregar/">Programar respaldos</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="/baja/">Eliminar respaldos</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="/logs/">Logs de altas</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="/cronlog/">Logs de Cronjobs</a>
-                </li>
-                {% if user.is_authenticated %}
-                    <li class="nav-item">
-                        <a class="nav-link" href="/logout/">Cerrar sesión</a>
-                    </li>
-                {% else %}
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            Dropdown
-                        </a>
-                        <ul class="dropdown-menu" aria-labelledby="navbarDropdown">
-                            <li><a class="dropdown-item" href="#">Acción</a></li>
-                            <li><a class="dropdown-item" href="#">Otra acción</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="#">Algo más aquí</a></li>
-                        </ul>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link disabled">Holi uwu </a>
-                    </li>
-                {% endif %}
-            </ul>          
-        </div>
-    </div>
-</nav>
-{% endblock %}
+<div class="container mt-4">
+    <header class="pt-3 pb-2 mb-3 border-bottom">
+      <h2>{% block encabezado %}{% endblock %}</h2>
+    </header>
 
-<section class="container">
-    {% block contenido %}{% endblock %}
-</section>
+    <main role="main">
+        {% block contenido %}{% endblock %}
+    </main>
+</div>
+
+<footer class="container mt-5 py-3 my-4 border-top">
+    <p class="text-center text-muted">&copy; {% now "Y" %} Mi Plataforma de Administración de Servidores</p>
+</footer>
+
 </body>
 </html>

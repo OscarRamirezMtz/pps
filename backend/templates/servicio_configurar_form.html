@@ -1,0 +1,54 @@
+{% extends "base2.html" %}
+{% load static %}
+
+{% block titulo %}{{ titulo }}{% endblock %}
+
+{% block encabezado %}{{ titulo }}{% endblock %}
+
+{% block contenido %}
+<div class="container">
+    <h2 class="mt-5 mb-4">{{ titulo }}</h2>
+
+    {% if messages %}
+        <div class="messages mb-3">
+            {% for message in messages %}
+                <div class="alert {% if message.tags == 'error' %}alert-danger{% elif message.tags == 'success' %}alert-success{% else %}alert-info{% endif %} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <form method="post" class="mt-4" id="servicio-config-form">
+        {% csrf_token %}
+        
+        <div class="alert alert-info small">
+            <strong>Nota:</strong> Si los campos de "Comando Personalizado" se dejan vacíos, el sistema intentará usar comandos estándar de <code>systemctl</code> (ej: <code>sudo systemctl status {{ form.nombre_servicio_remoto.value|default:"[nombre_servicio]" }}</code>).
+        </div>
+
+        {% for field in form %}
+            <div class="form-group row mb-3">
+                <label for="{{ field.id_for_label }}" class="col-sm-4 col-form-label">{{ field.label_tag }}</label>
+                <div class="col-sm-8">
+                    {{ field }}
+                    {% if field.help_text %}
+                        <small class="form-text text-muted">{{ field.help_text }}</small>
+                    {% endif %}
+                    {% if field.errors %}
+                        {% for error in field.errors %}
+                            <div class="text-danger mt-1"><small>{{ error }}</small></div>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+            </div>
+        {% endfor %}
+
+        <div class="form-group row mt-4">
+            <div class="col-sm-8 offset-sm-4">
+                <button type="submit" class="btn btn-primary">Guardar Configuración de Servicio</button>
+                <a href="{% url 'servidor_detalle' servidor_pk=servidor.pk %}" class="btn btn-secondary">Cancelar</a>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}

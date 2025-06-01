@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: proy_mysql_db
+    command: '--default-authentication-plugin=mysql_native_password'
+    volumes:
+      - mysql_data_proy:/var/lib/mysql/
+    environment:
+      # Docker Compose tomará estas de las variables exportadas por start-docker.sh
+      # en el entorno del host donde se ejecuta 'docker-compose up'.
+      # Asegúrate de que los nombres coincidan con lo que hay en tu secreto.env.cpt
+      - MYSQL_ROOT_PASSWORD
+      - MYSQL_DATABASE
+      - MYSQL_USER
+      - MYSQL_PASSWORD
+    ports:
+      - "33061:3306"
+    restart: always
+
+  web:
+    build: .
+    container_name: proy_django_app
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    # NO se usa env_file aquí
+    environment:
+      - SECRET_KEY: ${SECRET_KEY}
+      - SQL_DATABASE: ${DB_DATABASE}
+      - SQL_USER: ${DB_USER}
+      - SQL_PASSWORD: ${DB_PASSWORD}
+      - SQL_HOST: ${DB_HOST}
+      - SQL_PORT: ${DB_PORT}
+
+    depends_on:
+      - db
+    restart: always
+
+volumes:
+  mysql_data_proy: {}

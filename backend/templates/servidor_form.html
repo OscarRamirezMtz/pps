@@ -1,0 +1,69 @@
+{% extends "base2.html" %} {# Asumiendo que base2.html es tu plantilla base principal para vistas logueadas #}
+{% load static %}
+
+{% block titulo %}{{ titulo|default:"Gestionar Servidor" }}{% endblock %}
+
+{% block scripts %}
+    {# Puedes añadir scripts específicos si los necesitas, como los de limpiar o fade_errors #}
+    {# <script src="{% static 'js/limpiar.js' %}"></script> #}
+    <script src="{% static 'js/fade_errors.js' %}"></script> {# Lo tenías en alta.html #}
+{% endblock %}
+
+{% block encabezado %}
+    {{ titulo|default:"Gestionar Servidor" }}
+{% endblock %}
+
+{% block contenido %}
+    <div class="container">
+        <h2 class="mt-5 mb-4">{{ titulo|default:"Formulario de Servidor" }}</h2>
+
+        {% if messages %}
+            <div class="messages">
+                {% for message in messages %}
+                    <div class="alert {% if message.tags == 'error' %}alert-danger{% elif message.tags == 'success' %}alert-success{% else %}alert-info{% endif %} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        {# No necesitas el botón de cerrar si usas fade_errors.js, pero es opcional #}
+                        {# <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button> #}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <form method="post" class="mt-4" id="servidor-form">
+            {% csrf_token %}
+
+            {# Renderizar el formulario campo por campo para mayor control o usar {{ form.as_p }}, {{ form.as_table }}, etc. #}
+            {# Usaremos un estilo similar a tu alta.html #}
+
+            {% for field in form %}
+                <div class="form-group row mb-3">
+                    <label for="{{ field.id_for_label }}" class="col-sm-3 col-form-label">{{ field.label_tag }}</label>
+                    <div class="col-sm-9">
+                        {{ field }}
+                        {% if field.help_text %}
+                            <small class="form-text text-muted">{{ field.help_text }}</small>
+                        {% endif %}
+                        {% if field.errors %}
+                            {% for error in field.errors %}
+                                <div class="text-danger mt-1"><small>{{ error }}</small></div>
+                            {% endfor %}
+                        {% endif %}
+                    </div>
+                </div>
+            {% endfor %}
+
+            <div class="form-group row mt-4">
+                <div class="col-sm-9 offset-sm-3">
+                    <button type="submit" class="btn btn-primary">
+                        {% if object %} {# Si es un formulario de edición, object existirá #}
+                            Actualizar Servidor
+                        {% else %}
+                            Registrar Servidor
+                        {% endif %}
+                    </button>
+                    <a href="{% url 'servidor_listar' %}" class="btn btn-secondary">Cancelar</a>
+                </div>
+            </div>
+        </form>
+    </div>
+{% endblock %}
