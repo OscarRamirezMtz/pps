@@ -13,14 +13,11 @@ docker run \
     sonarsource/sonar-scanner-cli
 
 
-
-
 sonar-scanner \
   -Dsonar.projectKey=programacionsegura:pps \
   -Dsonar.sources=. \
   -Dsonar.host.url=http://localhost:9000 \
   -Dsonar.token=sqa_7fe578468082bf312146a393a33308c5d72d8025
-
 
 
 /home/oscar/sonar-scanner-7.1.0.4889-linux-x64/bin/sonar-scanner \

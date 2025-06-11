@@ -8,7 +8,6 @@ from backend.models import Servidor
 def generate_otp(length=8):
     return ''.join(random.choices(string.digits, k=length))
 
-
 TOKEN = os.environ.get('TELEGRAM_TOKEN')
 CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID')
 
@@ -25,7 +24,9 @@ def mandar_mensaje(mensaje: str, token=TOKEN, chat_id=CHAT_ID) -> bool:
     except Exception as e:
         print("Error enviando mensaje:", e)
         return False
-    
+
+
+
 def ejecutar_comando_ssh(servidor_obj: Servidor, comando: str) -> tuple[bool, str, str, int]:
     """
     Se conecta a un servidor vía SSH y ejecuta un comando.

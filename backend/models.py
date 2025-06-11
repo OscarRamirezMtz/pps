@@ -7,16 +7,7 @@ from django.utils import timezone
 from datetime import timedelta
 from django.core.validators import MinValueValidator, MaxValueValidator
 
-class Server1(models.Model):
-    nombre = models.CharField(max_length=100)
-    ip = models.CharField(max_length=15)
-    avala = models.CharField(max_length=100)
-    usuario_remoto = models.CharField(max_length=50)
-    timestamp = models.DateTimeField(auto_now_add=True)
-    detalles = models.TextField(blank=True, null=True)
-    
-    def __str__(self):
-        return self.nombre
+
 
 class OTPCode(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
@@ -24,8 +15,7 @@ class OTPCode(models.Model):
     creado = models.DateTimeField(auto_now_add=True)
 
     def expirado(self):
-        return timezone.now() > self.creado + timedelta(minutes=1)
-
+        return timezone.now() > self.creado + timedelta(minutes=3)
 
 class OTPIntento(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='otp_attempts')
@@ -38,7 +28,6 @@ class OTPIntento(models.Model):
 
     class Meta:
         unique_together = ('user', 'direccion_ip')
-
 
 class Servidor(models.Model):
     """
@@ -102,7 +91,6 @@ class Servidor(models.Model):
         verbose_name = "Servidor Linux"
         verbose_name_plural = "Servidores Linux"
         ordering = ['nombre'] # Ordenar por nombre por defecto en el admin y consultas
-
 
 class ServicioConfigurado(models.Model):
     """

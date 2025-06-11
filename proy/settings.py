@@ -28,7 +28,7 @@ DEBUG = True
 
 
 ALLOWED_HOSTS = ['*']
-#CSRF_TRUSTED_ORIGINS = []
+CSRF_TRUSTED_ORIGINS = ['https://servicios.uv']
 
 
 # Application definition
@@ -135,4 +135,9 @@ STATICFILES_DIRS = [
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 SESSION_COOKIE_AGE = 600
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True # se destruye la sesión si se cierra el navegador
+SESSION_COOKIE_SECURE = False # sólo en producción https
+SESSION_COOKIE_SAMESITE = 'Strict'
+SESSION_COOKIE_HTTPONLY = True # no se da acceso a javascript
+CSRF_COOKIE_HTTPONLY = True # no se da acceso a javascript
 LOGIN_URL = '/login/'

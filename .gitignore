@@ -102,6 +102,10 @@ celerybeat-schedule.*
 .venv 
 .cpt
 .env.cpt
+*.env 
+*.venv 
+*.cpt
+*.env.cpt
 env/ 
 venv/ 
 ENV/ 
@@ -138,3 +142,12 @@ GitHub.sublime-settings
 !.vscode/launch.json 
 !.vscode/extensions.json 
 .history
+
+#certs
+*.crt
+*.key
+*.pem
+*.csr
+
+#db
+*.sql

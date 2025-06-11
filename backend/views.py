@@ -24,8 +24,7 @@ from backend.models import (
 )
 from backend.forms import (
     LoginForm,  
-    ServidorForm, 
-#    FormSend, 
+    ServidorForm,
     ServicioConfiguradoForm
 )
 from backend.utils import (
@@ -38,7 +37,6 @@ MAX_OTP_INTENTOS = 3
 SEGUNDOS_BLOQUEO = 30
 User = get_user_model()
 
-
 def ip_cliente(request):
     """
     obtiene la direccion ip del cliente
@@ -50,61 +48,108 @@ def ip_cliente(request):
         ip = request.META.get('REMOTE_ADDR')
     return ip
 
+def _manejar_intento_bloqueado(request, intento):
+    """
+    Maneja la lógica si la IP/usuario ya está bloqueado y el bloqueo no ha expirado.
+    Retorna True si está bloqueado y se manejó, False en caso contrario.
+    """
+    if intento.bloqueado and timezone.now() < intento.bloqueado:
+        intento.bloqueado = timezone.now() + timedelta(seconds=SEGUNDOS_BLOQUEO)
+        intento.save()
+        messages.error(request, f"Esta IP sigue bloqueada para este usuario. El tiempo de bloqueo se ha reiniciado a {SEGUNDOS_BLOQUEO} segundos debido a un nuevo intento.")
+        if "preauth_user_id" in request.session:
+            request.session.pop("preauth_user_id", None)
+        return True
+    return False
+
+def _manejar_fallo_de_autenticacion_o_otp(request, intento, tipo_fallo="credenciales", username_ingresado=None):
+    """
+    Maneja la lógica de un fallo (ya sea de credenciales/contraseña o de OTP).
+    Incrementa intentos y bloquea si es necesario, usando MAX_OTP_INTENTOS como límite global.
+    """
+    intento.intentos += 1
+    
+    mensaje_especifico_fallo = "Contraseña incorrecta"
+    if tipo_fallo == "otp":
+        mensaje_especifico_fallo = "OTP incorrecto"
+
+    user_identifier_log = f" para el usuario '{username_ingresado}'" if username_ingresado else ""
+
+    if intento.intentos >= MAX_OTP_INTENTOS:
+        intento.bloqueado = timezone.now() + timedelta(seconds=SEGUNDOS_BLOQUEO)
+        messages.error(request, f"Demasiados intentos fallidos ({mensaje_especifico_fallo}) desde esta IP{user_identifier_log}. IP bloqueada para este usuario por {SEGUNDOS_BLOQUEO} segundos.")
+    else:
+        restantes = MAX_OTP_INTENTOS - intento.intentos
+        messages.error(request, f"{mensaje_especifico_fallo}{user_identifier_log}. Te quedan {restantes} intento(s) en total desde esta IP para este usuario.")
+    
+    intento.save()
+    
+    if tipo_fallo == "otp" or (intento.intentos >= MAX_OTP_INTENTOS):
+        request.session.pop("preauth_user_id", None)
+
+def _validar_otp(user_obj, otp_ingresado):
+    """
+    Valida el código OTP ingresado.
+    """
+    codigo_otp_guardado = OTPCode.objects.filter(user=user_obj).order_by("-creado").first()
+    if not codigo_otp_guardado:
+        return False
+
+    if hasattr(codigo_otp_guardado, 'expirado') and callable(getattr(codigo_otp_guardado, 'expirado')):
+        if codigo_otp_guardado.expirado():
+            return False 
+    return codigo_otp_guardado.codigo == otp_ingresado
 
 @require_http_methods(["GET", "POST"])
 def login_view(request):
     """
-    Primera fase del login:
-    Valida user y contraseña
-    si son correctos, genera OTP y redirige a verificación
+    Primera fase del login: Valida user y contraseña.
+    Si son correctos, genera OTP y redirige a verificación.
     """
     form = LoginForm(request.POST or None)
     direccion_cliente = ip_cliente(request)
-#
+
     if request.method == "POST" and form.is_valid():
-        user_obj = User.objects.filter(username=form.cleaned_data["username"]).first()
+        username_ingresado = form.cleaned_data["username"]
+        password_ingresada = form.cleaned_data["password"]
+
+        user_obj = User.objects.filter(username=username_ingresado).first()
+
         if not user_obj:
-            messages.error(request, "Credenciales inválidas.")
+            messages.error(request, "Nombre de usuario o contraseña incorrectos.")
             return redirect("login")
 
-        intento, created = OTPIntento.objects.get_or_create(
+        intento, _ = OTPIntento.objects.get_or_create(
             user=user_obj,
             direccion_ip=direccion_cliente,
             defaults={'intentos': 0, 'bloqueado': None}
         )
-#intento
+
         if intento.bloqueado and timezone.now() >= intento.bloqueado:
             intento.intentos = 0
             intento.bloqueado = None
             intento.save()
 
-        if intento.bloqueado and timezone.now() < intento.bloqueado:
-            intento.bloqueado = timezone.now() + timedelta(seconds=SEGUNDOS_BLOQUEO)
-            intento.save()
-            messages.error(request, f"Esta IP sigue bloqueada. el tiempo de bloqueo se ha reiniciado a {SEGUNDOS_BLOQUEO} segundos debido a un nuevo intento.")
+        if _manejar_intento_bloqueado(request, intento):
             return redirect("login")
 
-        if authenticate(request, username=user_obj.username, password=form.cleaned_data["password"]):
-            request.session["preauth_user_id"] = user_obj.id
-            codigo_otp_generado = generate_otp()
+        authenticated_user = authenticate(request, username=username_ingresado, password=password_ingresada)
 
-            OTPCode.objects.filter(user=user_obj).delete()
-            OTPCode.objects.create(user=user_obj, codigo=codigo_otp_generado)
-            mandar_mensaje(f"Tu código OTP es: `{codigo_otp_generado}`\nCaduca en 1 min.")
+        if authenticated_user:
+            request.session["preauth_user_id"] = authenticated_user.id
+            codigo_otp_generado = generate_otp() # De utils.py
+
+            OTPCode.objects.filter(user=authenticated_user).delete()
+            OTPCode.objects.create(user=authenticated_user, codigo=codigo_otp_generado)
+            
+            mandar_mensaje(f"Tu código OTP es: `{codigo_otp_generado}`\nCaduca en 1 min.") # De utils.py
+            
             return redirect("otp_verification")
         else:
-            intento.intentos += 1
-            if intento.intentos >= MAX_OTP_INTENTOS:
-                intento.bloqueado = timezone.now() + timedelta(seconds=SEGUNDOS_BLOQUEO)
-                messages.error(request, f"Demasiados intentos fallidos desde esta IP. usuario bloqueado por {SEGUNDOS_BLOQUEO} segundos.")
-            else:
-                restantes = MAX_OTP_INTENTOS - intento.intentos
-                messages.error(request, f"Contraseña incorrecta. Te quedan {restantes} intento(s).")
-            intento.save()
+            _manejar_fallo_de_autenticacion_o_otp(request, intento, tipo_fallo="credenciales", username_ingresado=username_ingresado)
             return redirect("login")
 
     return render(request, "login.html", {"form": form})
-
 
 @require_http_methods(["GET", "POST"])
 def otp_verification_view(request):
@@ -113,61 +158,41 @@ def otp_verification_view(request):
     """
     uid = request.session.get("preauth_user_id")
     if not uid:
-        messages.error(request, "Sesión inválida. vuelve a iniciar sesion.")
+        messages.error(request, "Sesión inválida o expirada. Vuelve a iniciar sesión.")
         return redirect("login")
 
     user_obj = get_object_or_404(User, pk=uid)
     direccion_cliente = ip_cliente(request)
 
-    try:
-        intento = OTPIntento.objects.get(user=user_obj, direccion_ip=direccion_cliente)
-    except OTPIntento.DoesNotExist:
-        intento, created = OTPIntento.objects.get_or_create(
-            user=user_obj,
-            direccion_ip=direccion_cliente,
-            defaults={'intentos': 0, 'bloqueado': None}
-        )
+    intento, _ = OTPIntento.objects.get_or_create(
+        user=user_obj,
+        direccion_ip=direccion_cliente,
+        defaults={'intentos': 0, 'bloqueado': None}
+    )
 
     if intento.bloqueado and timezone.now() >= intento.bloqueado:
         intento.intentos = 0
         intento.bloqueado = None
         intento.save()
 
-    if intento.bloqueado and timezone.now() < intento.bloqueado:
-        intento.bloqueado = timezone.now() + timedelta(seconds=SEGUNDOS_BLOQUEO)
-        intento.save()
-        messages.error(request, f"Esta IP sigue bloqueada. el tiempo de bloqueo se ha reiniciado a {SEGUNDOS_BLOQUEO} segundos debido a un nuevo intento.")
-        request.session.pop("preauth_user_id", None)
+    if _manejar_intento_bloqueado(request, intento):
         return redirect("login")
-#validacion de otp
+
     if request.method == "POST":
         otp_ingresado = request.POST.get("otp", "").strip()
-        codigo_otp_guardado = OTPCode.objects.filter(user=user_obj).order_by("-creado").first()
 
-        es_valido = codigo_otp_guardado and \
-                    not codigo_otp_guardado.expirado() and \
-                    codigo_otp_guardado.codigo == otp_ingresado
-# si es incorrecto se aumentan los intentos, 
-        if not es_valido:
-            intento.intentos += 1
-            if intento.intentos >= MAX_OTP_INTENTOS:
-                intento.bloqueado = timezone.now() + timedelta(seconds=SEGUNDOS_BLOQUEO)
-                messages.error(request, f"Demasiados intentos fallidos (OTP incorrecto). Usuario bloqueado para esta IP por {SEGUNDOS_BLOQUEO} segundos.")
-            else:
-                restantes = MAX_OTP_INTENTOS - intento.intentos
-                messages.error(request, f"OTP incorrecto. Te quedan {restantes} intento(s) en total desde esta IP.")
-            intento.save()
+        if _validar_otp(user_obj, otp_ingresado):
+            intento.delete()
+            auth_login(request, user_obj)
             request.session.pop("preauth_user_id", None)
+            OTPCode.objects.filter(user=user_obj).delete()
+            messages.success(request, "¡Inicio de sesión exitoso!")
+            return redirect("index")
+        else:
+            _manejar_fallo_de_autenticacion_o_otp(request, intento, tipo_fallo="otp", username_ingresado=user_obj.username)
             return redirect("login")
-#login completo se reinician los intentos y se redirige al index
-        intento.delete()
-        auth_login(request, user_obj)
-        request.session.pop("preauth_user_id", None)
-        OTPCode.objects.filter(user=user_obj).delete()
-        return redirect("index")
 
-    return render(request, "otp_verification.html")
-
+    return render(request, "otp_verification.html", {"user_obj": user_obj})
 
 @login_required(login_url="login")
 def logout_view(request):
@@ -179,14 +204,12 @@ def logout_view(request):
 def index(request):
     return render(request, "index.html")
 
-
 def _check_ping(ip: str) -> bool:
     try:
         subprocess.check_output(["ping", "-c", "1", ip])
         return True
     except subprocess.CalledProcessError:
         return False
-
 
 def _ssh_user_exists(ip: str, user: str) -> bool:
     """
@@ -201,7 +224,6 @@ def _ssh_user_exists(ip: str, user: str) -> bool:
         return True
     except (paramiko.AuthenticationException, paramiko.SSHException):
         return False
-
 
 @require_http_methods(["GET", "POST"])
 @login_required(login_url="login")
@@ -232,17 +254,14 @@ def add_server(request):
     context = {"form": form, "success_message": success}
     return render(request, "alta.html", context)
 
-
 @login_required(login_url="login")
 def list_servers(request):
     return render(request, "logs.html", {"logs": Server1.objects.all()})
-
 
 @require_http_methods(["GET"])
 @login_required(login_url='/login/')
 def index(request):
      return render(request, 'index.html')
-
 
 def _check_ping(host_address: str) -> bool:
     try:
@@ -255,7 +274,6 @@ def _check_ping(host_address: str) -> bool:
     except FileNotFoundError: # Si ping no está instalado o en el PATH
         messages.warning(request, "Comando 'ping' no encontrado. Saltando verificación de ping.")
         return True # O False, dependiendo de cómo quieras manejar esto
-
 
 def _ssh_user_exists(host_address: str, user: str, port: int = 22) -> bool:
     """
@@ -271,7 +289,6 @@ def _ssh_user_exists(host_address: str, user: str, port: int = 22) -> bool:
         return True
     except (paramiko.AuthenticationException, paramiko.SSHException, TimeoutError, paramiko.ssh_exception.NoValidConnectionsError) as e:
         return False
-
 
 @require_http_methods(["GET", "POST"])
 @login_required(login_url="login")
