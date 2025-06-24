@@ -1,0 +1,129 @@
+{% extends "base2.html" %}
+{% load static %}
+
+{% block titulo %}Dashboard de Monitoreo{% endblock %}
+
+{% block encabezado %}Dashboard de Monitoreo de Servidores{% endblock %}
+
+{% block contenido %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-lg-4 col-md-6 mb-3">
+            <div class="card text-white bg-primary h-100">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="bi bi-hdd-network-fill"></i> Servidores Totales</h5>
+                    <p class="card-text fs-2 fw-bold">{{ total_servidores }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4 col-md-6 mb-3">
+            <div class="card text-white bg-info h-100">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="bi bi-hdd-stack-fill"></i> Servicios Monitoreados</h5>
+                    <p class="card-text fs-2 fw-bold">{{ total_servicios }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <hr>
+
+    <div class="row">
+        {% for servidor in servidores %}
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-server"></i> {{ servidor.nombre }}</h5>
+                    <a href="{% url 'servidor_detalle' servidor.pk %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-gear"></i> Gestionar</a>
+                </div>
+                <ul class="list-group list-group-flush">
+                    {% for servicio in servidor.servicios_configurados.all %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center" data-service-id="{{ servicio.pk }}">
+                        <span>{{ servicio.nombre_servicio_remoto }}</span>
+                        
+                        {# Esta sección mostrará el estado inicial al cargar la página #}
+                        {% if servicio.estado_conocido == 'activo' %}
+                            <span class="badge bg-success rounded-pill">Activo</span>
+                        {% elif servicio.estado_conocido == 'inactivo' %}
+                             <span class="badge bg-danger rounded-pill">Inactivo</span>
+                        {% elif servicio.estado_conocido == 'error_verificacion' %}
+                             <span class="badge bg-warning text-dark rounded-pill">Error</span>
+                        {% else %}
+                             <span class="badge bg-secondary rounded-pill">Desconocido</span>
+                        {% endif %}
+                    </li>
+                    {% empty %}
+                    <li class="list-group-item text-muted">No hay servicios configurados.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col">
+            <p>No has registrado ningún servidor todavía. <a href="{% url 'servidor_crear' %}">¡Añade uno!</a></p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+
+    const STATUS_CLASSES = {
+        'activo': 'bg-success',
+        'inactivo': 'bg-danger',
+        'error_verificacion': 'bg-warning text-dark',
+        'desconocido': 'bg-secondary',
+    };
+
+
+    function updateDashboard() {
+
+
+        fetch("{% url 'api_dashboard_status' %}")
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('La respuesta de la red no fue OK: ' + response.statusText);
+                }
+                return response.json();
+            })
+            .then(data => {
+
+
+                if (!data.servidores) {
+                    console.error("La respuesta del API no tiene el formato esperado.");
+                    return;
+                }
+
+
+                data.servidores.forEach(servidor => {
+                    servidor.servicios.forEach(servicio => {
+
+                        const serviceElement = document.querySelector(`li[data-service-id="${servicio.id}"]`);
+                        
+                        if (serviceElement) {
+                            const badge = serviceElement.querySelector('.badge');
+                            if (badge) {
+
+                                badge.textContent = servicio.estado_display;
+                                badge.className = 'badge rounded-pill'; // Reseteamos las clases
+                                const newClasses = STATUS_CLASSES[servicio.estado] || STATUS_CLASSES['desconocido'];
+                                newClasses.split(' ').forEach(cls => badge.classList.add(cls));
+                            }
+                        }
+                    });
+                });
+            })
+            .catch(error => console.error('Error durante la actualización del dashboard:', error));
+    }
+
+    // Llama a la función una vez que la página ha cargado
+    updateDashboard();
+
+    // intervalo
+    setInterval(updateDashboard, 30000);
+});
+</script>
+{% endblock %}

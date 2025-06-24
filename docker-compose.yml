@@ -17,8 +17,10 @@ services:
          PYTHONUNBUFFERED: 1
          TELEGRAM_TOKEN: ${TELEGRAM_TOKEN}
          TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID}
+         MASTER_KEY: ${MASTER_KEY}
       volumes:
         - .:/app
+        - ./.ssh_keys/id_rsa:/root/.ssh/id_rsa:ro 
         - static_data_mi_app:/var/www/staticfiles
       deploy:
          resources:

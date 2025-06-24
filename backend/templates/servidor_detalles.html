@@ -55,7 +55,6 @@
                         <th>Nombre del Servicio</th>
                         <th>Descripción</th>
                         <th>Estado Conocido</th>
-                        <th>Puerto</th>
                         <th>Gestión Habilitada</th>
                         <th>Acciones</th>
                     </tr>
@@ -75,7 +74,6 @@
                                     {{ servicio.get_estado_conocido_display }}
                                 </span>
                             </td>
-                            <td>{{ servicio.puerto_monitorizar|default:"N/A" }}</td>
                             <td>{% if servicio.habilitado_para_gestion %}Sí{% else %}No{% endif %}</td>
                             <td>
                                 {% if servicio.habilitado_para_gestion %}
@@ -111,7 +109,6 @@
             No hay servicios configurados para este servidor todavía.
         </div>
     {% endif %}
-
     <div class="mt-4">
         <a href="{% url 'servidor_listar' %}" class="btn btn-outline-secondary">Volver a la Lista de Servidores</a>
     </div>

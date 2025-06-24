@@ -20,16 +20,8 @@ from django.urls import path, include
 from django.views.generic import RedirectView
 
 urlpatterns = [
+    path('dashboard/', views.dashboard_view, name='dashboard'),
     path('admin/', admin.site.urls),
-    #esta es la url que redirige una vez accedido al sitio "respaldosuv.mx" directamente al login
-    #path('actualiza/', views.get_server_choices),
-    #path('logs/', views.ver_logs, name='server_list'),
-    #path('agregar/', views.crear_respaldo, name='agregar'),
-    #path('baja/', views.ver_configuraciones_respaldo, name='ver_configuraciones_respaldo'),
-    #path('cronlog/', views.cron_log_view, name='cron_log_view'),
-    #path('ajax-cron-log/', views.ajax_cron_log, name='ajax_cron_log'),
-    #path('login/', views.login_view, name='login'),
-    #path('alta/', views.dar_alta, name='server_add'),
     path('', RedirectView.as_view(url='/login/', permanent=False)),
     path('index/', views.index, name='index'),
     path('logout/',views.logout_view, name='logout'),
@@ -42,5 +34,5 @@ urlpatterns = [
     path('servidores/<int:servidor_pk>/detalle/', views.servidor_detalle, name='servidor_detalle'),
     path('servidores/<int:servidor_pk>/servicios/configurar/', views.servicio_configurar_crear, name='servicio_configurar_crear'),
     path('servicios/<int:servicio_pk>/accion/<str:accion>/', views.servicio_accion, name='servicio_accion'),
-
+    path('api/dashboard-status/', views.api_dashboard_status, name='api_dashboard_status'),
 ]

@@ -1,37 +1,31 @@
 from __future__ import annotations
-from django.shortcuts import get_object_or_404, redirect, render
-import math
-import shlex
-import subprocess
 from datetime import timedelta
-import paramiko
+from pathlib import Path
+import paramiko, logging
+from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth import (
-    authenticate,
-    get_user_model,
-    login as auth_login,
-    logout as auth_logout,
-)
+from django.contrib.auth import ( authenticate, get_user_model, login as auth_login, logout as auth_logout )
 from django.contrib.auth.decorators import login_required
+from django.db.models import Count
 from django.http import JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
-from backend.models import (
-    OTPIntento,
-    OTPCode,
-    Servidor,
-    ServicioConfigurado
-)
-from backend.forms import (
-    LoginForm,  
-    ServidorForm,
-    ServicioConfiguradoForm
-)
-from backend.utils import (
-    generate_otp, 
-    mandar_mensaje, 
-    ejecutar_comando_ssh
-)
+from .forms import LoginForm, ServidorForm, ServicioConfiguradoForm
+from .models import OTPCode, OTPIntento, Servidor, ServicioConfigurado
+from .utils import ( ejecutar_comando_remoto, generate_otp, mandar_mensaje )
+
+logger = logging.getLogger("servidores_app")
+logger.setLevel(logging.INFO)
+
+file_handler = logging.FileHandler('app.log', mode='a')
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s', datefmt='%d-%b-%y %H:%M:%S')
+file_handler.setFormatter(formatter)
+
+logger.addHandler(file_handler)
+
+# Silenciar paramiko
+logging.getLogger("paramiko").setLevel(logging.WARNING)
 
 MAX_OTP_INTENTOS = 3
 SEGUNDOS_BLOQUEO = 30
@@ -143,13 +137,12 @@ def login_view(request):
             OTPCode.objects.create(user=authenticated_user, codigo=codigo_otp_generado)
             
             mandar_mensaje(f"Tu código OTP es: `{codigo_otp_generado}`\nCaduca en 1 min.") # De utils.py
-            
             return redirect("otp_verification")
         else:
             _manejar_fallo_de_autenticacion_o_otp(request, intento, tipo_fallo="credenciales", username_ingresado=username_ingresado)
             return redirect("login")
-
     return render(request, "login.html", {"form": form})
+    
 
 @require_http_methods(["GET", "POST"])
 def otp_verification_view(request):
@@ -196,172 +189,105 @@ def otp_verification_view(request):
 
 @login_required(login_url="login")
 def logout_view(request):
+    """
+    Cierre de sesión
+    """
     auth_logout(request)
     return redirect("login")
-
-
-@login_required(login_url="login")
-def index(request):
-    return render(request, "index.html")
-
-def _check_ping(ip: str) -> bool:
-    try:
-        subprocess.check_output(["ping", "-c", "1", ip])
-        return True
-    except subprocess.CalledProcessError:
-        return False
-
-def _ssh_user_exists(ip: str, user: str) -> bool:
-    """
-    Comprueba que `user@ip` sea un login SSH válido
-    (suponemos que la clave pública ya está cargada).
-    """
-    try:
-        ssh = paramiko.SSHClient()
-        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        ssh.connect(ip, username=user, timeout=5)
-        ssh.close()
-        return True
-    except (paramiko.AuthenticationException, paramiko.SSHException):
-        return False
-
-@require_http_methods(["GET", "POST"])
-@login_required(login_url="login")
-def add_server(request):
-    success = None
-    form = FormServ(request.POST or None)
-    form.set_user(request.user)          # añade automáticamente avala
-
-    if request.method == "POST" and form.is_valid():
-        nombre  = form.cleaned_data["nombre"]
-        ip      = form.cleaned_data["ip"]
-        uremoto = form.cleaned_data["user_remoto"]
-
-        if not _check_ping(ip):
-            messages.error(request, "Servidor inaccesible (ping fallido).")
-        elif not _ssh_user_exists(ip, uremoto):
-            messages.error(request, f'El user remoto "{uremotо}" no existe o no tiene acceso SSH.')
-        else:
-            Server1.objects.create(
-                nombre=nombre,
-                ip=ip,
-                avala=request.user,
-                user_remoto=uremotо,
-                detalles="Alta exitosa",
-            )
-            success = "Servidor guardado con éxito."
-
-    context = {"form": form, "success_message": success}
-    return render(request, "alta.html", context)
-
-@login_required(login_url="login")
-def list_servers(request):
-    return render(request, "logs.html", {"logs": Server1.objects.all()})
 
 @require_http_methods(["GET"])
 @login_required(login_url='/login/')
 def index(request):
-     return render(request, 'index.html')
-
-def _check_ping(host_address: str) -> bool:
-    try:
-        # Para dominios, ping podría no ser la mejor prueba de "accesibilidad" para SSH,
-        # pero puede ser un primer filtro.
-        subprocess.check_output(["ping", "-c", "1", host_address])
-        return True
-    except subprocess.CalledProcessError:
-        return False
-    except FileNotFoundError: # Si ping no está instalado o en el PATH
-        messages.warning(request, "Comando 'ping' no encontrado. Saltando verificación de ping.")
-        return True # O False, dependiendo de cómo quieras manejar esto
-
-def _ssh_user_exists(host_address: str, user: str, port: int = 22) -> bool:
     """
-    Comprueba que `user@host_address:port` sea un login SSH válido
-    (suponemos que la clave pública ya está cargada o se manejará la autenticación).
-    """
-    try:
-        ssh = paramiko.SSHClient()
-        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        # Usar el puerto del formulario o el por defecto del modelo Servidor
-        ssh.connect(host_address, port=port, username=user, timeout=5)
-        ssh.close()
-        return True
-    except (paramiko.AuthenticationException, paramiko.SSHException, TimeoutError, paramiko.ssh_exception.NoValidConnectionsError) as e:
-        return False
+    Muestra la pagina principal a los usuarios logueados
+    """     
+    return render(request, 'index.html')
 
 @require_http_methods(["GET", "POST"])
-@login_required(login_url="login")
-def servidor_crear(request): # Renombrada de add_server para claridad
+@login_required
+def servidor_crear(request):
+    """
+    Maneja la Logica para agregar un servidor nuevo
+    establece la conexion SSH al servidor
+    copia la clave SSH
+    si todo es correcto
+    agrega el servidor a la BD
+    """    
     if request.method == "POST":
         form = ServidorForm(request.POST)
         if form.is_valid():
-            # Antes de guardar, asignamos el usuario que registra
-            servidor_instance = form.save(commit=False)
-            servidor_instance.registrado_por = request.user
+            datos_servidor_dict = {
+                'hostname': form.cleaned_data['direccion_host'],
+                'username': form.cleaned_data['usuario_remoto'],
+                'port': form.cleaned_data['ssh_port'],
+            }
+            password = form.cleaned_data['password']
+            ssh_connection = None
             
-            # Validaciones adicionales antes de guardar definitivamente
-            host = servidor_instance.direccion_host
-            usuario_ssh = servidor_instance.usuario_remoto
-            puerto_ssh = servidor_instance.ssh_port
+            try:
+                # Conexión SSH al servidor
+                ssh_connection = paramiko.SSHClient()
+                ssh_connection.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                ssh_connection.connect(**datos_servidor_dict, password=password, timeout=10)
 
-            # Podrías hacer el ping aquí, pero _ssh_user_exists es más crítico
-            # if not _check_ping(host):
-            #     messages.error(request, f"Servidor en '{host}' inaccesible (ping fallido).")
-            # el form.save() abajo disparará la creación, así que el mensaje de error debe prevenir esto
-            if not servidor_instance.clave_ssh_configurada:
-                 # Si la clave no está configurada, al menos verificamos que el usuario/puerto/host sea alcanzable
-                 # y el usuario exista. La clave se configurará después.
-                if not _ssh_user_exists(host, usuario_ssh, puerto_ssh):
-                    messages.error(request, f"No se pudo conectar o el usuario '{usuario_ssh}' no existe/no tiene acceso SSH en '{host}:{puerto_ssh}'. Verifica los datos o configura la clave SSH manualmente y marca la casilla.")
-                    # No guardamos si la conexión SSH falla y la clave no está marcada como configurada
-                else:
-                    servidor_instance.save()
-                    messages.success(request, f"Servidor '{servidor_instance.nombre}' registrado con éxito. Recuerda configurar la clave SSH si aún no lo has hecho.")
-                    return redirect('servidor_listar') # Redirigir a la lista de servidores
-            else: # Si el usuario marcó que la clave ya está configurada
+                # Copiar clave SSH
+                key_filepath = Path(settings.BASE_DIR) / '.ssh_keys' / 'app_id_rsa.pub'
+                with open(key_filepath, 'r') as f:
+                    public_key_string = f.read().strip()
+                
+                comando_ssh_key = f"mkdir -p ~/.ssh; chmod 700 ~/.ssh; touch ~/.ssh/authorized_keys; chmod 600 ~/.ssh/authorized_keys; grep -qF '{public_key_string}' ~/.ssh/authorized_keys || echo '{public_key_string}' >> ~/.ssh/authorized_keys"
+                stdin, stdout, stderr = ssh_connection.exec_command(comando_ssh_key)
+                if stdout.channel.recv_exit_status() != 0:
+                    raise Exception(f"Falló al instalar la clave SSH: {stderr.read().decode()}")
+
+                # Guardado en la BD
+                servidor_instance = form.save(commit=False)
+                servidor_instance.registrado_por = request.user
                 servidor_instance.save()
-                messages.success(request, f"Servidor '{servidor_instance.nombre}' registrado con éxito.")
-                return redirect('servidor_listar') # Redirigir a la lista de servidores
+                messages.success(request, f"Servidor '{servidor_instance.nombre}' registrado y configurado exitosamente")
+                logger.info(f'Servidor registrado {datos_servidor_dict}')
+                return redirect('servidor_listar')
+                
+
+            except Exception as e:
+                form.add_error(None, f"Error no se pudo conectar al servidor: {e}")
+            finally: # cierra la conexion SSH
+                if ssh_connection:
+                    ssh_connection.close()
     else:
         form = ServidorForm()
-
-    context = {"form": form, "titulo": "Registrar Nuevo Servidor"}
-    return render(request, "servidor_form.html", context) # Asumiendo un template
-
-def servidor_listar(request): # Renombrada de list_servers
-    servidores = Servidor.objects.filter(registrado_por=request.user) # O todos: Servidor.objects.all()
-    context = {"servidores": servidores, "titulo": "Mis Servidores Registrados"}
-    return render(request, "servidor_listar.html", context) # Asumiendo un template
-
-def servidor_eliminar(request, pk):
-    # Obtener el servidor o devolver un 404 si no existe
-    # Asegurarse de que el servidor pertenezca al usuario actual o que sea un superusuario
-    # por seguridad, para que un usuario no pueda eliminar servidores de otro.
-    servidor = get_object_or_404(Servidor, pk=pk)
-
-    # Opcional: Comprobación de permisos más granular
-    # if servidor.registrado_por != request.user and not request.user.is_superuser:
-    #     messages.error(request, "No tienes permiso para eliminar este servidor.")
-    #     return redirect('servidor_listar') # O a alguna página de error
-
-    try:
-        nombre_servidor = servidor.nombre
-        servidor.delete()
-        messages.success(request, f"El servidor '{nombre_servidor}' ha sido eliminado correctamente.")
-    except Exception as e:
-        messages.error(request, f"Ocurrió un error al intentar eliminar el servidor: {e}")
     
-    return redirect('servidor_listar') # Redirigir de vuelta a la lista de servidores
+    context = {"form": form, "titulo": "Registrar y Configurar Servidor"}
+    return render(request, "servidor_form.html", context)
+
+
+def servidor_listar(request):
+    """
+    Muestra los servidores registrados
+    """    
+    servidores = Servidor.objects.filter(registrado_por=request.user)
+    context = {"servidores": servidores, "titulo": "Mis Servidores Registrados"}
+    return render(request, "servidor_listar.html", context) 
+
+@login_required
+def servidor_eliminar(request, pk):
+    """
+    Elimina el servidor de la BD
+    """    
+    servidor = get_object_or_404(Servidor, pk=pk, registrado_por=request.user)
+    # Eliminamos el servidor de la base de datos
+    nombre_servidor = servidor.nombre
+    servidor.delete()
+    messages.success(request, f"El servidor '{nombre_servidor}' ha sido eliminado de la plataforma.")
+    logger.info(f'Servidor registrado {servidor.direccion_host}')
+    return redirect('servidor_listar')
 
 @login_required(login_url="login")
 def servidor_detalle(request, servidor_pk):
+    """
+    Muestra detalles del servidor
+    """    
     servidor = get_object_or_404(Servidor, pk=servidor_pk)
-    # Opcional: Verificar permisos si el servidor no debe ser visible para todos los admins
-    # if servidor.registrado_por != request.user and not request.user.is_superuser:
-    #     messages.error(request, "No tienes permiso para ver este servidor.")
-    #     return redirect('servidor_listar')
-        
     servicios = ServicioConfigurado.objects.filter(servidor=servidor)
     context = {
         'servidor': servidor,
@@ -373,14 +299,17 @@ def servidor_detalle(request, servidor_pk):
 @login_required(login_url="login")
 @require_http_methods(["GET", "POST"])
 def servicio_configurar_crear(request, servidor_pk):
-    servidor = get_object_or_404(Servidor, pk=servidor_pk)
-    # Opcional: Verificar permisos más estrictos si es necesario
+    """
+    Maneja la logia para configurar un servicio nuevo
+    """    
+    servidor = get_object_or_404(Servidor, pk=servidor_pk, registrado_por=request.user)
+    #solo el usuario que registro el servidor puede registrar servicios en este
     if hasattr(servidor, 'registrado_por') and servidor.registrado_por != request.user and not request.user.is_superuser:
         messages.error(request, "No tienes permiso para configurar servicios en este servidor.")
         return redirect('servidor_detalle', servidor_pk=servidor_pk)
 
     if request.method == "POST":
-        # CORRECCIÓN 1: Usar ServicioConfiguradoForm
+
         form = ServicioConfiguradoForm(request.POST)
         if form.is_valid():
             servicio = form.save(commit=False)
@@ -389,14 +318,14 @@ def servicio_configurar_crear(request, servidor_pk):
             try:
                 servicio.save()
                 messages.success(request, f"Servicio '{servicio.nombre_servicio_remoto}' configurado exitosamente para '{servidor.nombre}'.")
-                # CORRECCIÓN 2: Nombre correcto de la URL de redirección
+                logger.info(f'Servicio registrado {servicio.nombre_servicio_remoto} por {servidor.registrado_por}')
                 return redirect('servidor_detalle', servidor_pk=servidor.pk)
             except Exception as e:
                 messages.error(request, f"Error al guardar la configuración del servicio: {e}")
         else:
             messages.error(request, "Por favor corrige los errores en el formulario.")
     else:
-        # CORRECCIÓN 3: Usar ServicioConfiguradoForm() para instanciar en GET
+
         form = ServicioConfiguradoForm()
 
     context = {
@@ -404,71 +333,132 @@ def servicio_configurar_crear(request, servidor_pk):
         'servidor': servidor,
         'titulo': f"Configurar Nuevo Servicio en {servidor.nombre}"
     }
-    # CORRECCIÓN 4: Ruta completa a la plantilla para claridad
+
     return render(request, 'servicio_configurar_form.html', context)
 
 @login_required(login_url="login")
 @require_http_methods(["POST"])
 def servicio_accion(request, servicio_pk, accion):
-    servicio = get_object_or_404(ServicioConfigurado, pk=servicio_pk)
+    """
+    Ejecuta las acciones iniciar, detener, reiniciar y verificar estado de los servidores
+    """    
+    servicio = get_object_or_404(ServicioConfigurado, pk=servicio_pk, servidor__registrado_por=request.user)
     servidor = servicio.servidor
-
     if hasattr(servidor, 'registrado_por') and servidor.registrado_por != request.user and not request.user.is_superuser:
         messages.error(request, "No tienes permiso para ejecutar acciones en este servicio.")
         return redirect('servidor_detalle', servidor_pk=servidor.pk)
-
-    if not servicio.habilitado_para_gestion:
-        messages.warning(request, f"La gestión para el servicio '{servicio.nombre_servicio_remoto}' está deshabilitada.")
-        return redirect('servidor_detalle', servidor_pk=servidor.pk)
-    
-    comando_a_ejecutar = ""
-    accion_exitosa = False 
-
-    if accion == 'levantar':
-        comando_a_ejecutar = servicio.comando_levantar or f"sudo systemctl start {servicio.nombre_servicio_remoto}"
-        messages.info(request, f"Simulando 'levantar' servicio: {servicio.nombre_servicio_remoto}. Comando: {comando_a_ejecutar}")
-        accion_exitosa = True 
-        servicio.estado_conocido = 'activo' 
-        
-    elif accion == 'bajar':
-        comando_a_ejecutar = servicio.comando_bajar or f"sudo systemctl stop {servicio.nombre_servicio_remoto}"
-        messages.info(request, f"Simulando 'bajar' servicio: {servicio.nombre_servicio_remoto}. Comando: {comando_a_ejecutar}")
-        accion_exitosa = True 
-        servicio.estado_conocido = 'inactivo'
-
-    elif accion == 'reiniciar':
-        comando_a_ejecutar = servicio.comando_reiniciar or f"sudo systemctl restart {servicio.nombre_servicio_remoto}"
-        messages.info(request, f"Simulando 'reiniciar' servicio: {servicio.nombre_servicio_remoto}. Comando: {comando_a_ejecutar}")
-        accion_exitosa = True
-        servicio.estado_conocido = 'activo'
-
-    elif accion == 'verificar_estado':
-        comando_a_ejecutar = servicio.comando_verificar_estado or f"sudo systemctl status {servicio.nombre_servicio_remoto}"
-        messages.info(request, f"Simulando 'verificar estado' de: {servicio.nombre_servicio_remoto}. Comando: {comando_a_ejecutar}")
-        accion_exitosa = True
-        # Aquí deberías obtener el estado real y actualizar 'servicio.estado_conocido'
-        # servicio.estado_conocido = 'desconocido' # Temporalmente
-        # Lógica de ejemplo para actualizar (necesitarías la salida real del comando):
-        # if "active (running)" in resultado_ssh.stdout:
-        #     servicio.estado_conocido = 'activo'
-        # elif "inactive (dead)" in resultado_ssh.stdout:
-        #     servicio.estado_conocido = 'inactivo'
-        # else:
-        #     servicio.estado_conocido = 'error_verificacion'
-
-    else:
+    comandos_map = {
+        'levantar': f"systemctl start {servicio.nombre_servicio_remoto}",
+        'bajar': f"systemctl stop {servicio.nombre_servicio_remoto}",
+        'reiniciar': f"systemctl restart {servicio.nombre_servicio_remoto}",
+        'verificar_estado': f"systemctl is-active {servicio.nombre_servicio_remoto}"
+    }
+    if accion not in comandos_map:
         messages.error(request, "Acción desconocida.")
         return redirect('servidor_detalle', servidor_pk=servidor.pk)
-
-    if accion_exitosa: # O basado en el resultado real de la ejecución del comando SSH
-        # servicio.log_ultima_accion = resultado_ssh.stdout + "\n" + resultado_ssh.stderr # Log real
-        servicio.ultima_comprobacion_estado = timezone.now()
-        servicio.save()
-        messages.success(request, f"Acción '{accion}' (simulada) para '{servicio.nombre_servicio_remoto}' procesada.")
+    comando_a_ejecutar = comandos_map[accion]
+    resultado_ssh = ejecutar_comando_remoto(servidor, comando_a_ejecutar)
+    servicio.ultima_comprobacion_estado = timezone.now()
+    if resultado_ssh['error_conexion']:
+        messages.error(request, f"Fallo de conexión al ejecutar '{accion}': {resultado_ssh['error_conexion']}")
+        servicio.estado_conocido = 'error_verificacion'
+    elif accion == 'verificar_estado':
+        stdout = resultado_ssh['stdout'].strip()
+        if stdout == "active":
+            servicio.estado_conocido = 'activo'
+            messages.success(request, f"El servicio '{servicio.nombre_servicio_remoto}' está ACTIVO.")
+        elif stdout == "inactive":
+            servicio.estado_conocido = 'inactivo'
+            messages.success(request, f"El servicio '{servicio.nombre_servicio_remoto}' está INACTIVO.")
+        elif stdout == "failed":
+            servicio.estado_conocido = 'error_verificacion'
+            messages.error(request, f"El servicio '{servicio.nombre_servicio_remoto}' tiene un estado FALLIDO.")
+        else:
+            servicio.estado_conocido = 'desconocido'
+            messages.warning(request, f"Estado no reconocido: '{stdout}'.")
     else:
-        messages.error(request, f"Falló la acción '{accion}' (simulada) para '{servicio.nombre_servicio_remoto}'.")
-        # servicio.log_ultima_accion = resultado_ssh.stdout + "\n" + resultado_ssh.stderr # Log real
-        # servicio.save()
-
-
+        if resultado_ssh['exit_code'] == 0:
+            messages.success(request, f"Acción '{accion}' para '{servicio.nombre_servicio_remoto}' enviada con éxito.")
+            
+            if accion == 'levantar' or accion == 'reiniciar':
+                servicio.estado_conocido = 'activo'
+                messages.info(request, "Estado actualizado a 'Activo'.")
+                logger.info(f'Servicio {servicio.nombre_servicio_remoto} se inicio por {servidor.registrado_por}')
+            elif accion == 'bajar':
+                servicio.estado_conocido = 'inactivo'
+                messages.info(request, "Estado actualizado a 'Inactivo' (optimista).")
+                logger.info(f'Servicio {servicio.nombre_servicio_remoto} se detuvo por {servidor.registrado_por}')
+        else:
+            messages.error(request, f"Falló la acción '{accion}' para '{servicio.nombre_servicio_remoto}'.")
+            servicio.estado_conocido = 'error_verificacion'
+            if resultado_ssh['stderr']:
+                messages.warning(request, f"Error reportado: {resultado_ssh['stderr']}")
+    servicio.save()
     return redirect('servidor_detalle', servidor_pk=servidor.pk)
+
+@login_required(login_url="login")
+def dashboard_view(request):
+    """
+    Muestra el dashboard de los servidores y servicios
+    """
+    servidores = Servidor.objects.filter(
+        registrado_por=request.user
+    ).prefetch_related('servicios_configurados')
+    total_servidores = servidores.count()
+    total_servicios = ServicioConfigurado.objects.filter(servidor__in=servidores).count()
+    servicios_por_estado = ServicioConfigurado.objects.filter(
+        servidor__in=servidores
+    ).values('estado_conocido').annotate(cantidad=Count('estado_conocido'))
+    context = {
+        'servidores': servidores,
+        'total_servidores': total_servidores,
+        'total_servicios': total_servicios,
+        'servicios_por_estado': list(servicios_por_estado),
+        'titulo': "Dashboard de Monitoreo"
+    }
+    return render(request, 'dashboard.html', context)
+
+@login_required(login_url="login")
+def api_dashboard_status(request):
+    """
+    verifica el estado de los servicios
+    """
+    servidores = Servidor.objects.filter(registrado_por=request.user)
+    response_data = []
+    for servidor in servidores:
+        servidor_data = {
+            'id': servidor.id,
+            'nombre': servidor.nombre,
+            'servicios': []
+        }
+        for servicio in servidor.servicios_configurados.all():
+            comando = f"systemctl is-active {servicio.nombre_servicio_remoto}"
+            resultado_ssh = ejecutar_comando_remoto(servidor, comando)
+            estado_real_actual = servicio.estado_conocido
+            if resultado_ssh['error_conexion']:
+                estado_real_actual = 'error_verificacion'
+            else:
+                stdout = resultado_ssh['stdout'].strip()
+                if stdout == "active":
+                    estado_real_actual = 'activo'
+                elif stdout == "inactive":
+                    estado_real_actual = 'inactivo'
+                elif stdout == "failed":
+                    estado_real_actual = 'error_verificacion'
+                else:
+                    estado_real_actual = 'desconocido'
+#se actualiza el estado del servicio en la bd
+            if servicio.estado_conocido != estado_real_actual:
+                servicio.estado_conocido = estado_real_actual
+                servicio.save()
+            
+            servidor_data['servicios'].append({
+                'id': servicio.id,
+                'nombre': servicio.nombre_servicio_remoto,
+                'estado': servicio.estado_conocido,
+                'estado_display': servicio.get_estado_conocido_display(),
+            })
+            
+        response_data.append(servidor_data)
+        
+    return JsonResponse({'servidores': response_data})

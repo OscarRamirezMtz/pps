@@ -1,0 +1,56 @@
+.
+├── backend
+│   ├── admin.py
+│   ├── apps.py
+│   ├── forms.py
+│   ├── __init__.py
+│   ├── models.py
+│   ├── templates
+│   │   ├── alta.html
+│   │   ├── baja.html
+│   │   ├── base2.html
+│   │   ├── base.html
+│   │   ├── cronlog.html
+│   │   ├── index.html
+│   │   ├── login.html
+│   │   ├── logs.html
+│   │   ├── niu.html
+│   │   ├── otp_verification.html
+│   │   ├── servicio_configurar_form.html
+│   │   ├── servidor_detalles.html
+│   │   ├── servidor_form.html
+│   │   └── servidor_listar.html
+│   ├── tests.py
+│   ├── utils.py
+│   └── views.py
+├── backup.sql
+├── certificados
+│   ├── servicios.uv_crt.crt
+│   ├── servicios.uv_key.pem
+│   └── servicios.uv_request.csr
+├── comando
+├── comando.bak
+├── docker-compose.yml
+├── dockerfile
+├── estructura.txt
+├── manage.py
+├── nginx
+│   ├── conf
+│   │   └── nginx.conf
+│   └── default.conf
+├── proy
+│   ├── asgi.py
+│   ├── __init__.py
+│   ├── settings.py
+│   ├── urls.py
+│   └── wsgi.py
+├── README.md
+├── requirements.txt
+├── run.sh
+├── secreto.env.bak
+├── secreto.env.cpt
+├── sonar-project.properties
+├── start.sh
+└── start.sh.bak
+
+7 directories, 47 files

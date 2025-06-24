@@ -22,12 +22,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.environ.get('SECRET_KEY')
-
+MASTER_KEY = os.environ.get('MASTER_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = ['servicios.uv', 'localhost', '127.0.0.1']
 CSRF_TRUSTED_ORIGINS = ['https://servicios.uv']
 
 
@@ -134,10 +134,24 @@ STATICFILES_DIRS = [
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-SESSION_COOKIE_AGE = 600
-SESSION_EXPIRE_AT_BROWSER_CLOSE = True # se destruye la sesión si se cierra el navegador
-SESSION_COOKIE_SECURE = False # sólo en producción https
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+SECURE_SSL_REDIRECT = True
+
+SESSION_COOKIE_AGE = 3600
+
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+
+SESSION_COOKIE_SECURE = True
+
+CSRF_COOKIE_SECURE = True
+
 SESSION_COOKIE_SAMESITE = 'Strict'
-SESSION_COOKIE_HTTPONLY = True # no se da acceso a javascript
-CSRF_COOKIE_HTTPONLY = True # no se da acceso a javascript
+
+SESSION_COOKIE_HTTPONLY = True
+
+CSRF_COOKIE_HTTPONLY = True
+
 LOGIN_URL = '/login/'
+
+LOGOUT_REDIRECT_URL = '/login/'

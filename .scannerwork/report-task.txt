@@ -1,6 +1,6 @@
-projectKey=programacionsegura:pps
-serverUrl=http://localhost:9000
+projectKey=pps:proyecto
+serverUrl=http://127.0.0.1:9000
 serverVersion=25.4.0.105899
-dashboardUrl=http://localhost:9000/dashboard?id=programacionsegura%3Apps
-ceTaskId=7cc23eb6-d316-47a4-8351-575f8442cc48
-ceTaskUrl=http://localhost:9000/api/ce/task?id=7cc23eb6-d316-47a4-8351-575f8442cc48
+dashboardUrl=http://127.0.0.1:9000/dashboard?id=pps%3Aproyecto
+ceTaskId=01098ebc-33fc-4783-a3b1-839debbaa7ee
+ceTaskUrl=http://127.0.0.1:9000/api/ce/task?id=01098ebc-33fc-4783-a3b1-839debbaa7ee

@@ -40,7 +40,6 @@
                         <th>Dirección (IP/Dominio)</th>
                         <th>Usuario Remoto</th>
                         <th>Puerto SSH</th>
-                        <th>Clave SSH Configurada</th>
                         <th>Registrado por</th>
                         <th>Fecha Registro</th>
                         <th style="min-width: 220px;">Acciones</th> {# Ancho mínimo para los botones #}
@@ -55,7 +54,6 @@
                             <td>{{ servidor.direccion_host }}</td>
                             <td>{{ servidor.usuario_remoto }}</td>
                             <td>{{ servidor.ssh_port }}</td>
-                            <td>{% if servidor.clave_ssh_configurada %}<span class="badge bg-success">Sí</span>{% else %}<span class="badge bg-warning text-dark">No</span>{% endif %}</td>
                             <td>{{ servidor.registrado_por.username|default:"N/A" }}</td>
                             <td>{{ servidor.fecha_registro|date:"d/m/Y H:i" }}</td>
                             <td>

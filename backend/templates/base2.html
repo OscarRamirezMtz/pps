@@ -57,6 +57,12 @@
                             <i class="bi bi-plus-circle-fill"></i> Registrar Servidor
                         </a>
                     </li>
+                    <li class="nav-item">
+                        {# Enlace directo para Registrar Servidor #}
+                        <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}">
+                            <i class="bi bi-plus-circle-fill"></i> Dashboard
+                        </a>
+                    </li>
                     {# SECCIÓN DE RESPALDOS YA FUE ELIMINADA #}
                 </ul>
                 <ul class="navbar-nav ms-auto mb-2 mb-lg-0">

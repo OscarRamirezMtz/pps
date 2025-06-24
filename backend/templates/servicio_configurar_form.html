@@ -21,11 +21,6 @@
 
     <form method="post" class="mt-4" id="servicio-config-form">
         {% csrf_token %}
-        
-        <div class="alert alert-info small">
-            <strong>Nota:</strong> Si los campos de "Comando Personalizado" se dejan vacíos, el sistema intentará usar comandos estándar de <code>systemctl</code> (ej: <code>sudo systemctl status {{ form.nombre_servicio_remoto.value|default:"[nombre_servicio]" }}</code>).
-        </div>
-
         {% for field in form %}
             <div class="form-group row mb-3">
                 <label for="{{ field.id_for_label }}" class="col-sm-4 col-form-label">{{ field.label_tag }}</label>

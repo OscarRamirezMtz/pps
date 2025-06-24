@@ -1,2 +1,2 @@
 # pps
-proyecto programación seegura
+proyecto programación segura

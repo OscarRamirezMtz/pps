@@ -1,12 +1,12 @@
-{% extends "base2.html" %} {# Asumiendo que base2.html es tu plantilla base principal para vistas logueadas #}
+{% extends "base2.html" %} {##}
 {% load static %}
 
 {% block titulo %}{{ titulo|default:"Gestionar Servidor" }}{% endblock %}
 
 {% block scripts %}
-    {# Puedes añadir scripts específicos si los necesitas, como los de limpiar o fade_errors #}
+    {# añadir scripts, como los de limpiar o fade_errors #}
     {# <script src="{% static 'js/limpiar.js' %}"></script> #}
-    <script src="{% static 'js/fade_errors.js' %}"></script> {# Lo tenías en alta.html #}
+    <script src="{% static 'js/fade_errors.js' %}"></script> {#  #}
 {% endblock %}
 
 {% block encabezado %}
@@ -34,6 +34,19 @@
 
             {# Renderizar el formulario campo por campo para mayor control o usar {{ form.as_p }}, {{ form.as_table }}, etc. #}
             {# Usaremos un estilo similar a tu alta.html #}
+    {# ======================================================= #}
+    {# ===== BLOQUE PARA VER ERRORES GENERALES ===== #}
+    {% if form.non_field_errors %}
+        <div class="alert alert-danger" role="alert">
+            <strong>¡Error en la configuración!</strong>
+            {% for error in form.non_field_errors %}
+                <p class="mb-0">{{ error }}</p>
+            {% endfor %}
+        </div>
+    {% endif %}
+    {# ======================================================= #}
+
+
 
             {% for field in form %}
                 <div class="form-group row mb-3">
